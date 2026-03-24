@@ -126,6 +126,8 @@ bun run sync:upstream
 
 By default this pulls from a sibling checkout at `../compound-engineering-plugin`, refreshes the vendored `plugins/compound-engineering` snapshot, and regenerates the bundled Pi skills/MCPorter config.
 
+Maintainer rule: changes to conversion behavior, plugin content, or target semantics should be made upstream first. This repo is the Pi distribution layer.
+
 ## Recommended OSS adoption flow
 
 1. Start with side-by-side generation:

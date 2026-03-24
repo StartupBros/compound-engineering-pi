@@ -94,6 +94,15 @@ For MCP interoperability, install [MCPorter](https://github.com/steipete/mcporte
 npm i -g mcporter
 ```
 
+## Maintainer workflow
+
+This repo now follows an **upstream-first** model:
+- make converter/content changes in `compound-engineering-plugin` first
+- refresh this package with `bun run sync:upstream`
+- keep this repo focused on Pi packaging, Pi docs, and Pi-specific compatibility behavior
+
+See [MAINTENANCE.md](./MAINTENANCE.md) for the exact boundary and workflow.
+
 ## Credits
 
 Built on the [Compound Engineering plugin](https://github.com/EveryInc/compound-engineering-plugin) by [Every](https://every.to) and [Kieran Klaassen](https://github.com/kieranklaassen). Read the [original writeup](https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents).
