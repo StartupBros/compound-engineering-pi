@@ -60,6 +60,7 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
     "@sinclair/typebox": "*"
   },
   "pi": {
@@ -79,6 +80,9 @@
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.64.0",
+    "@mariozechner/pi-tui": "^0.64.0",
+    "@sinclair/typebox": "^0.34.41",
     "bun-types": "^1.0.0"
   }
 }
