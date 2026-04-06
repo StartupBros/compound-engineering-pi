@@ -2,7 +2,8 @@ export const PI_COMPAT_EXTENSION_SOURCE = `import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent"
+import type { ExtensionAPI, ExtensionContext, Theme } from "@mariozechner/pi-coding-agent"
+import { matchesKey, truncateToWidth, type TUI, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui"
 import { Type } from "@sinclair/typebox"
 
 const MAX_BYTES = 50 * 1024
@@ -168,15 +169,215 @@ function formatSubagentSummary(results: SubagentResult[]): string {
   return header + lines.join("\\n")
 }
 
+type MultiSelectPromptResult = {
+  answers: string[]
+  cancelled: boolean
+}
+
+class MultiSelectQuestionComponent {
+  private cursorIndex = 0
+  private selectedIndices = new Set<number>()
+  private customAnswer: string | null = null
+  private awaitingCustomAnswer = false
+  private resolved = false
+
+  constructor(
+    private question: string,
+    private options: string[],
+    private allowCustom: boolean,
+    private tui: TUI,
+    private theme: Theme,
+    private promptForCustomAnswer: () => Promise<string | null>,
+    private done: (result: MultiSelectPromptResult | null) => void,
+  ) {}
+
+  invalidate(): void {}
+
+  private get customIndex(): number {
+    return this.allowCustom ? this.options.length : -1
+  }
+
+  private get doneIndex(): number {
+    return this.options.length + (this.allowCustom ? 1 : 0)
+  }
+
+  private finish(result: MultiSelectPromptResult | null): void {
+    if (this.resolved) return
+    this.resolved = true
+    this.done(result)
+  }
+
+  private getAnswers(): string[] {
+    const selected = Array.from(this.selectedIndices)
+      .sort((a, b) => a - b)
+      .map((index) => this.options[index])
+      .filter((value): value is string => Boolean(value))
+
+    return this.customAnswer ? [...selected, this.customAnswer] : selected
+  }
+
+  private async editCustomAnswer(): Promise<void> {
+    if (this.awaitingCustomAnswer) return
+
+    this.awaitingCustomAnswer = true
+    this.tui.requestRender()
+
+    try {
+      const custom = await this.promptForCustomAnswer()
+      if (custom && custom.trim()) {
+        this.customAnswer = custom.trim()
+      }
+    } finally {
+      this.awaitingCustomAnswer = false
+      this.tui.requestRender()
+    }
+  }
+
+  handleInput(data: string): void {
+    if (this.awaitingCustomAnswer) return
+
+    if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) {
+      this.finish(null)
+      return
+    }
+
+    if (matchesKey(data, "up")) {
+      this.cursorIndex = Math.max(0, this.cursorIndex - 1)
+      this.tui.requestRender()
+      return
+    }
+
+    if (matchesKey(data, "down")) {
+      this.cursorIndex = Math.min(this.doneIndex, this.cursorIndex + 1)
+      this.tui.requestRender()
+      return
+    }
+
+    if ((matchesKey(data, "backspace") || matchesKey(data, "delete")) && this.allowCustom && this.cursorIndex === this.customIndex) {
+      this.customAnswer = null
+      this.tui.requestRender()
+      return
+    }
+
+    const onRegularOption = this.cursorIndex < this.options.length
+    const onCustomOption = this.allowCustom && this.cursorIndex === this.customIndex
+    const onDone = this.cursorIndex === this.doneIndex
+
+    if (matchesKey(data, "space") && onRegularOption) {
+      if (this.selectedIndices.has(this.cursorIndex)) {
+        this.selectedIndices.delete(this.cursorIndex)
+      } else {
+        this.selectedIndices.add(this.cursorIndex)
+      }
+      this.tui.requestRender()
+      return
+    }
+
+    if (!matchesKey(data, "return")) return
+
+    if (onRegularOption) {
+      if (this.selectedIndices.has(this.cursorIndex)) {
+        this.selectedIndices.delete(this.cursorIndex)
+      } else {
+        this.selectedIndices.add(this.cursorIndex)
+      }
+      this.tui.requestRender()
+      return
+    }
+
+    if (onCustomOption) {
+      void this.editCustomAnswer()
+      return
+    }
+
+    if (!onDone) return
+
+    const answers = this.getAnswers()
+    if (answers.length === 0) {
+      this.tui.requestRender()
+      return
+    }
+
+    this.finish({ answers, cancelled: false })
+  }
+
+  render(width: number): string[] {
+    const innerWidth = Math.max(38, Math.min(width, 100) - 2)
+    const pad = (line: string) => line + " ".repeat(Math.max(0, innerWidth - visibleWidth(line)))
+    const row = (line = "") => this.theme.fg("border", "│") + pad(truncateToWidth(line, innerWidth)) + this.theme.fg("border", "│")
+    const lines = [this.theme.fg("border", "╭" + "─".repeat(innerWidth) + "╮")]
+
+    for (const wrapped of wrapTextWithAnsi(this.theme.bold(this.question), innerWidth - 1)) {
+      lines.push(row(" " + wrapped))
+    }
+
+    lines.push(row())
+
+    this.options.forEach((option, index) => {
+      const selected = this.selectedIndices.has(index)
+      const cursor = this.cursorIndex === index ? this.theme.fg("accent", "→") : " "
+      const checkbox = selected ? this.theme.fg("success", "[✓]") : "[ ]"
+      const label = selected ? this.theme.fg("success", option) : option
+      lines.push(row(" " + cursor + " " + checkbox + " " + label))
+    })
+
+    if (this.allowCustom) {
+      const hasCustomAnswer = Boolean(this.customAnswer)
+      const cursor = this.cursorIndex === this.customIndex ? this.theme.fg("accent", "→") : " "
+      const checkbox = hasCustomAnswer ? this.theme.fg("success", "[✓]") : "[ ]"
+      const label = hasCustomAnswer
+        ? this.theme.fg("success", "Other: " + this.customAnswer)
+        : "Other (type custom answer)"
+      lines.push(row(" " + cursor + " " + checkbox + " " + label))
+    }
+
+    const doneCursor = this.cursorIndex === this.doneIndex ? this.theme.fg("accent", "→") : " "
+    const answerCount = this.getAnswers().length
+    const doneLabel = answerCount > 0 ? "Done (" + answerCount + " selected)" : "Done"
+    lines.push(row(" " + doneCursor + " " + this.theme.bold(doneLabel)))
+    lines.push(row())
+
+    const statusLine = this.awaitingCustomAnswer
+      ? "Waiting for custom answer…"
+      : "↑↓ navigate • Space toggle • Enter toggle/open/done • Del clears custom • Esc cancel"
+    lines.push(row(" " + this.theme.fg("dim", statusLine)))
+    lines.push(this.theme.fg("border", "╰" + "─".repeat(innerWidth) + "╯"))
+    return lines
+  }
+}
+
+async function askMultiSelectQuestion(
+  ctx: ExtensionContext,
+  question: string,
+  options: string[],
+  allowCustom: boolean,
+): Promise<MultiSelectPromptResult | null> {
+  return ctx.ui.custom<MultiSelectPromptResult | null>((tui, theme, _kb, done) => {
+    return new MultiSelectQuestionComponent(
+      question,
+      options,
+      allowCustom,
+      tui,
+      theme,
+      async () => {
+        const answer = await ctx.ui.input("Your answer")
+        return answer?.trim() ? answer.trim() : null
+      },
+      done,
+    )
+  }, { overlay: true })
+}
+
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "ask_user_question",
     label: "Ask User Question",
-    description: "Ask the user a question with optional choices.",
+    description: "Ask the user a question with optional choices. Supports single-select and multi-select.",
     parameters: Type.Object({
       question: Type.String({ description: "Question shown to the user" }),
       options: Type.Optional(Type.Array(Type.String(), { description: "Selectable options" })),
       allowCustom: Type.Optional(Type.Boolean({ default: true })),
+      multiSelect: Type.Optional(Type.Boolean({ description: "Allow selecting multiple options before confirming", default: false })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!ctx.hasUI) {
@@ -189,6 +390,7 @@ export default function (pi: ExtensionAPI) {
 
       const options = params.options ?? []
       const allowCustom = params.allowCustom ?? true
+      const multiSelect = params.multiSelect ?? false
 
       if (options.length === 0) {
         const answer = await ctx.ui.input(params.question)
@@ -202,6 +404,22 @@ export default function (pi: ExtensionAPI) {
         return {
           content: [{ type: "text", text: "User answered: " + answer }],
           details: { answer, mode: "input" },
+        }
+      }
+
+      if (multiSelect) {
+        const result = await askMultiSelectQuestion(ctx, params.question, options, allowCustom)
+        if (!result || result.cancelled) {
+          return {
+            content: [{ type: "text", text: "User cancelled." }],
+            details: { answer: null, answers: [], mode: "multi-select" },
+          }
+        }
+
+        const answer = result.answers.join(", ")
+        return {
+          content: [{ type: "text", text: "User selected: " + answer }],
+          details: { answer, answers: result.answers, mode: "multi-select" },
         }
       }
 

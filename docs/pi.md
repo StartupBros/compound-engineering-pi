@@ -68,6 +68,7 @@ The generated extension provides these tools:
 
 ### `ask_user_question`
 Interactive question/choice tool for workflows that need explicit user decisions.
+Supports single-select and multi-select questions via an optional `multiSelect: true` flag, while preserving the simpler `question` / `options` / `allowCustom` shape.
 
 ### `subagent`
 Runs skill-based subagents through nested Pi sessions.

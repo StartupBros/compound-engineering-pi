@@ -50,6 +50,7 @@ Use the **ask_user_question tool** to ask questions **one at a time**.
 
 **Guidelines (see `brainstorming` skill for detailed techniques):**
 - Prefer multiple choice when natural options exist
+- In Pi, set `multiSelect: true` only when multiple compatible answers should be selectable at once; otherwise keep the default single-select behavior
 - Start broad (purpose, users) then narrow (constraints, edge cases)
 - Validate assumptions explicitly
 - Ask about success criteria
