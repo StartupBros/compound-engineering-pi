@@ -1,3 +1,4 @@
+import { promises as fs } from "fs"
 import path from "path"
 import {
   backupFile,
@@ -9,6 +10,7 @@ import {
   writeText,
 } from "../utils/files"
 import type { PiBundle } from "../types/pi"
+import { shouldTransformSkillMarkdownFile, transformMarkdownDocumentForPi } from "../utils/pi-transform"
 
 const PI_AGENTS_BLOCK_START = "<!-- BEGIN COMPOUND PI TOOL MAP -->"
 const PI_AGENTS_BLOCK_END = "<!-- END COMPOUND PI TOOL MAP -->"
@@ -37,7 +39,12 @@ export async function writePiBundle(outputRoot: string, bundle: PiBundle): Promi
   }
 
   for (const skill of bundle.skillDirs) {
-    await copyDir(skill.sourceDir, path.join(paths.skillsDir, skill.name))
+    const targetDir = path.join(paths.skillsDir, skill.name)
+    await copyDir(skill.sourceDir, targetDir)
+    await transformSkillMarkdownFiles(targetDir)
+    if (skill.skillContent) {
+      await writeText(path.join(targetDir, "SKILL.md"), skill.skillContent + "\n")
+    }
   }
 
   for (const skill of bundle.generatedSkills) {
@@ -57,6 +64,27 @@ export async function writePiBundle(outputRoot: string, bundle: PiBundle): Promi
   }
 
   await ensurePiAgentsBlock(paths.agentsPath)
+}
+
+async function transformSkillMarkdownFiles(rootDir: string): Promise<void> {
+  const entries = await fs.readdir(rootDir, { withFileTypes: true })
+
+  for (const entry of entries) {
+    const fullPath = path.join(rootDir, entry.name)
+    if (entry.isDirectory()) {
+      await transformSkillMarkdownFiles(fullPath)
+      continue
+    }
+    if (!entry.isFile() || !shouldTransformSkillMarkdownFile(fullPath) || path.basename(fullPath) === "SKILL.md") {
+      continue
+    }
+
+    const raw = await readText(fullPath)
+    const transformed = transformMarkdownDocumentForPi(raw)
+    if (transformed !== raw) {
+      await writeText(fullPath, transformed.endsWith("\n") ? transformed : transformed + "\n")
+    }
+  }
 }
 
 function resolvePiPaths(outputRoot: string) {

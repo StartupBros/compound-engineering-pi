@@ -185,12 +185,12 @@ describe("CLI", () => {
     const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-plugin-workspace-"))
     const fixtureRoot = path.join(import.meta.dir, "fixtures", "sample-plugin")
 
-    const pluginRoot = path.join(workspaceRoot, "plugins", "compound-engineering")
+    const pluginRoot = path.join(workspaceRoot, "plugins", "demo-plugin")
     await fs.mkdir(path.dirname(pluginRoot), { recursive: true })
     await fs.cp(fixtureRoot, pluginRoot, { recursive: true })
 
     // Intentional collision: same folder name in cwd root, but not a plugin.
-    const conflictingPath = path.join(workspaceRoot, "compound-engineering")
+    const conflictingPath = path.join(workspaceRoot, "demo-plugin")
     await fs.mkdir(conflictingPath, { recursive: true })
     await fs.writeFile(path.join(conflictingPath, "README.md"), "not a claude plugin")
 
@@ -200,7 +200,7 @@ describe("CLI", () => {
       "run",
       path.join(projectRoot, "src", "index.ts"),
       "install",
-      "compound-engineering",
+      "demo-plugin",
       "--to",
       "opencode",
     ], {

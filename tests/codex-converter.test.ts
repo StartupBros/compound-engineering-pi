@@ -31,6 +31,13 @@ const fixturePlugin: ClaudePlugin = {
     {
       name: "existing-skill",
       description: "Existing skill",
+      argumentHint: undefined,
+      disableModelInvocation: undefined,
+      body: "Use the existing skill.",
+      frontmatter: {
+        name: "existing-skill",
+        description: "Existing skill",
+      },
       sourceDir: "/tmp/plugin/skills/existing-skill",
       skillPath: "/tmp/plugin/skills/existing-skill/SKILL.md",
     },

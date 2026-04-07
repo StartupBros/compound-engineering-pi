@@ -1,10 +1,18 @@
 import { formatFrontmatter } from "../utils/frontmatter"
-import type { ClaudeAgent, ClaudeCommand, ClaudeMcpServer, ClaudePlugin } from "../types/claude"
+import { appendPiCompatibilityNoteIfNeeded, transformTextBodyForPi } from "../utils/pi-transform"
+import type {
+  ClaudeAgent,
+  ClaudeCommand,
+  ClaudeMcpServer,
+  ClaudePlugin,
+  ClaudeSkill,
+} from "../types/claude"
 import type {
   PiBundle,
   PiGeneratedSkill,
   PiMcporterConfig,
   PiMcporterServer,
+  PiSkillDir,
 } from "../types/pi"
 import type { ClaudeToOpenCodeOptions } from "./claude-to-opencode"
 import { PI_COMPAT_EXTENSION_SOURCE } from "../templates/pi/compat-extension"
@@ -18,7 +26,9 @@ export function convertClaudeToPi(
   _options: ClaudeToPiOptions,
 ): PiBundle {
   const promptNames = new Set<string>()
-  const usedSkillNames = new Set<string>(plugin.skills.map((skill) => normalizeName(skill.name)))
+  const usedSkillNames = new Set<string>()
+
+  const skillDirs = plugin.skills.map((skill) => convertSkill(skill, usedSkillNames))
 
   const prompts = plugin.commands
     .filter((command) => !command.disableModelInvocation)
@@ -35,10 +45,7 @@ export function convertClaudeToPi(
 
   return {
     prompts,
-    skillDirs: plugin.skills.map((skill) => ({
-      name: skill.name,
-      sourceDir: skill.sourceDir,
-    })),
+    skillDirs,
     generatedSkills,
     extensions,
     mcporterConfig: plugin.mcpServers ? convertMcpToMcporter(plugin.mcpServers) : undefined,
@@ -52,12 +59,28 @@ function convertPrompt(command: ClaudeCommand, usedNames: Set<string>) {
     "argument-hint": command.argumentHint,
   }
 
-  let body = transformContentForPi(command.body)
-  body = appendCompatibilityNoteIfNeeded(body)
+  let body = transformTextBodyForPi(command.body)
+  body = appendPiCompatibilityNoteIfNeeded(body)
 
   return {
     name,
     content: formatFrontmatter(frontmatter, body.trim()),
+  }
+}
+
+function convertSkill(skill: ClaudeSkill, usedNames: Set<string>): PiSkillDir {
+  const name = uniqueName(normalizeName(skill.name), usedNames)
+  const frontmatter = {
+    ...skill.frontmatter,
+    name,
+  }
+  let body = transformTextBodyForPi(skill.body)
+  body = appendPiCompatibilityNoteIfNeeded(body)
+
+  return {
+    name,
+    sourceDir: skill.sourceDir,
+    skillContent: formatFrontmatter(frontmatter, body.trim()),
   }
 }
 
@@ -88,91 +111,6 @@ function convertAgent(agent: ClaudeAgent, usedNames: Set<string>): PiGeneratedSk
     name,
     content: formatFrontmatter(frontmatter, body),
   }
-}
-
-function transformContentForPi(body: string): string {
-  let result = body
-
-  // Task repo-research-analyst(feature_description)
-  // -> Run subagent with agent="repo-research-analyst" and task="feature_description"
-  const taskPattern = /^(\s*-?\s*)Task\s+([a-z][a-z0-9-]*)\(([^)]+)\)/gm
-  result = result.replace(taskPattern, (_match, prefix: string, agentName: string, args: string) => {
-    const skillName = normalizeName(agentName)
-    const trimmedArgs = args.trim().replace(/\s+/g, " ")
-    return `${prefix}Run subagent with agent=\"${skillName}\" and task=\"${trimmedArgs}\".`
-  })
-
-  // Claude-specific tool references
-  result = result.replace(/\bAskUserQuestion\b/g, "ask_user_question")
-  result = result.replace(/\bTodoWrite\b/g, "file-based todos (todos/ + /skill:file-todos)")
-  result = result.replace(/\bTodoRead\b/g, "file-based todos (todos/ + /skill:file-todos)")
-
-  // /command-name or /workflows:command-name -> /workflows-command-name
-  const slashCommandPattern = /(?<![:\w])\/([a-z][a-z0-9_:-]*?)(?=[\s,."')\]}`]|$)/gi
-  result = result.replace(slashCommandPattern, (match, commandName: string) => {
-    if (commandName.includes("/")) return match
-    if (["dev", "tmp", "etc", "usr", "var", "bin", "home"].includes(commandName)) {
-      return match
-    }
-
-    if (commandName.startsWith("skill:")) {
-      const skillName = commandName.slice("skill:".length)
-      return `/skill:${normalizeName(skillName)}`
-    }
-
-    const withoutPrefix = commandName.startsWith("prompts:")
-      ? commandName.slice("prompts:".length)
-      : commandName
-
-    return `/${normalizeName(withoutPrefix)}`
-  })
-
-  result = rewriteSlashCommandExecutionForPi(result)
-
-  return result
-}
-
-function rewriteSlashCommandExecutionForPi(body: string): string {
-  let result = body
-
-  result = result.replace(/Call the \/([a-z][a-z0-9_-]*) command/gi, (_match, commandName: string) => {
-    return `Invoke \`/${commandName}\` as a Pi prompt (never as a direct bash command)`
-  })
-
-  result = result.replace(/Run `\/([a-z][a-z0-9_-]*)([^`]*)`/gi, (_match, commandName: string, rawArgs: string) => {
-    let args = (rawArgs ?? "").trim()
-    let backgroundSuffix = ""
-
-    if (args.endsWith("&")) {
-      args = args.slice(0, -1).trimEnd()
-      backgroundSuffix = " &"
-    }
-
-    const prompt = args.length > 0 ? `/${commandName} ${args}` : `/${commandName}`
-    const escapedPrompt = prompt.replace(/"/g, '\\"')
-    return `Run \`pi --no-session -p "${escapedPrompt}"${backgroundSuffix}\``
-  })
-
-  if (result !== body && !result.includes("Slash commands are Pi prompt templates")) {
-    result += "\n\n**Important:** Slash commands are Pi prompt templates, not shell executables. Never run `/...` directly via bash."
-  }
-
-  return result
-}
-
-function appendCompatibilityNoteIfNeeded(body: string): string {
-  if (!/\bmcp\b/i.test(body)) return body
-
-  const note = [
-    "",
-    "## Pi + MCPorter note",
-    "For MCP access in Pi, use MCPorter via the generated tools:",
-    "- `mcporter_list` to inspect available MCP tools",
-    "- `mcporter_call` to invoke a tool",
-    "",
-  ].join("\n")
-
-  return body + note
 }
 
 function convertMcpToMcporter(servers: Record<string, ClaudeMcpServer>): PiMcporterConfig {

@@ -47,7 +47,10 @@ export type ClaudeCommand = {
 export type ClaudeSkill = {
   name: string
   description?: string
+  argumentHint?: string
   disableModelInvocation?: boolean
+  body: string
+  frontmatter: Record<string, unknown>
   sourceDir: string
   skillPath: string
 }
