@@ -169,7 +169,9 @@ async function resolvePluginPath(input: string): Promise<ResolvedPluginPath> {
 
   // For named installs, prefer bundled ./plugins/<name> to avoid collisions
   // with similarly named directories in the repo root.
-  if (await pathExists(pluginsPath)) {
+  // Exception: compound-engineering itself changes rapidly upstream; prefer the
+  // canonical GitHub source unless the caller passed an explicit local path.
+  if (raw !== "compound-engineering" && await pathExists(pluginsPath)) {
     return { path: pluginsPath }
   }
 

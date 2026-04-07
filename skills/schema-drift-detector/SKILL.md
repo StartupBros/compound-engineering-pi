@@ -1,6 +1,7 @@
 ---
 name: schema-drift-detector
 description: Detects unrelated schema.rb changes in PRs by cross-referencing against included migrations. Use when reviewing PRs with database schema changes.
+disable-model-invocation: true
 ---
 
 <examples>

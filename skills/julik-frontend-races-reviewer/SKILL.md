@@ -1,6 +1,7 @@
 ---
 name: julik-frontend-races-reviewer
 description: Conditional code-review persona, selected when the diff touches async UI code, Stimulus/Turbo lifecycles, or DOM-timing-sensitive frontend behavior. Reviews code for race conditions and janky UI failure modes.
+disable-model-invocation: true
 ---
 
 # Julik Frontend Races Reviewer

@@ -37,31 +37,9 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-ideate" },
   },
   {
-    command: "ce-ideate",
-    description: "Alias for /ce:ideate",
-    source: { kind: "skill", skillName: "ce-ideate" },
-  },
-  {
     command: "ce:brainstorm",
     description: "Compound Engineering brainstorm workflow",
     source: { kind: "skill", skillName: "ce-brainstorm" },
-  },
-  {
-    command: "ce-brainstorm",
-    description: "Alias for /ce:brainstorm",
-    source: { kind: "skill", skillName: "ce-brainstorm" },
-  },
-  {
-    command: "workflows-brainstorm",
-    description: "Legacy alias for /ce:brainstorm",
-    source: { kind: "skill", skillName: "ce-brainstorm" },
-    deprecatedMessage: "/workflows-brainstorm is legacy; running canonical /ce:brainstorm",
-  },
-  {
-    command: "workflows:brainstorm",
-    description: "Deprecated alias for /ce:brainstorm",
-    source: { kind: "skill", skillName: "ce-brainstorm" },
-    deprecatedMessage: "/workflows:brainstorm is deprecated; running canonical /ce:brainstorm",
   },
   {
     command: "ce:plan",
@@ -69,43 +47,9 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-plan" },
   },
   {
-    command: "ce-plan",
-    description: "Alias for /ce:plan",
-    source: { kind: "skill", skillName: "ce-plan" },
-  },
-  {
-    command: "workflows-plan",
-    description: "Legacy alias for /ce:plan",
-    source: { kind: "skill", skillName: "ce-plan" },
-    deprecatedMessage: "/workflows-plan is legacy; running canonical /ce:plan",
-  },
-  {
-    command: "workflows:plan",
-    description: "Deprecated alias for /ce:plan",
-    source: { kind: "skill", skillName: "ce-plan" },
-    deprecatedMessage: "/workflows:plan is deprecated; running canonical /ce:plan",
-  },
-  {
     command: "ce:work",
     description: "Compound Engineering execution workflow",
     source: { kind: "skill", skillName: "ce-work" },
-  },
-  {
-    command: "ce-work",
-    description: "Alias for /ce:work",
-    source: { kind: "skill", skillName: "ce-work" },
-  },
-  {
-    command: "workflows-work",
-    description: "Legacy alias for /ce:work",
-    source: { kind: "skill", skillName: "ce-work" },
-    deprecatedMessage: "/workflows-work is legacy; running canonical /ce:work",
-  },
-  {
-    command: "workflows:work",
-    description: "Deprecated alias for /ce:work",
-    source: { kind: "skill", skillName: "ce-work" },
-    deprecatedMessage: "/workflows:work is deprecated; running canonical /ce:work",
   },
   {
     command: "ce:compound",
@@ -113,30 +57,8 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-compound" },
   },
   {
-    command: "ce-compound",
-    description: "Alias for /ce:compound",
-    source: { kind: "skill", skillName: "ce-compound" },
-  },
-  {
-    command: "workflows-compound",
-    description: "Legacy alias for /ce:compound",
-    source: { kind: "skill", skillName: "ce-compound" },
-    deprecatedMessage: "/workflows-compound is legacy; running canonical /ce:compound",
-  },
-  {
-    command: "workflows:compound",
-    description: "Deprecated alias for /ce:compound",
-    source: { kind: "skill", skillName: "ce-compound" },
-    deprecatedMessage: "/workflows:compound is deprecated; running canonical /ce:compound",
-  },
-  {
     command: "ce:compound-refresh",
     description: "Refresh or prune stale compound learnings",
-    source: { kind: "skill", skillName: "ce-compound-refresh" },
-  },
-  {
-    command: "ce-compound-refresh",
-    description: "Alias for /ce:compound-refresh",
     source: { kind: "skill", skillName: "ce-compound-refresh" },
   },
   {
@@ -191,7 +113,7 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "onboarding" },
   },
   {
-    command: "changelog",
+    command: "ce:changelog",
     description: "Create a changelog for recent merges",
     source: { kind: "skill", skillName: "changelog" },
   },

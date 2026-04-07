@@ -1,6 +1,7 @@
 ---
 name: kieran-python-reviewer
 description: Conditional code-review persona, selected when the diff touches Python code. Reviews changes with Kieran's strict bar for Pythonic clarity, type hints, and maintainability.
+disable-model-invocation: true
 ---
 
 # Kieran Python Reviewer

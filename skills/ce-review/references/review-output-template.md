@@ -92,16 +92,37 @@ Use this **exact format** when presenting synthesized review findings. Findings 
 > **Fix order:** P0 auth bypass -> P1 memory/pagination -> P2 error handling if straightforward
 ```
 
+## Anti-patterns
+
+Do NOT produce output like this. The following is wrong:
+
+```markdown
+Findings
+
+Sev: P1
+File: foo.go:42
+Issue: Some problem description
+Reviewer(s): adversarial
+Confidence: 0.85
+Route: advisory -> human
+────────────────────────────────────────
+Sev: P2
+File: bar.go:99
+Issue: Another problem
+```
+
+This fails because: no pipe-delimited tables, no severity-grouped `###` headers, uses box-drawing horizontal rules, no numbered findings, no `## Code Review Results` title, and the verdict is not in a blockquote. Always use the table format from the example above.
+
 ## Formatting Rules
 
-- **Pipe-delimited markdown tables** -- never ASCII box-drawing characters
+- **Pipe-delimited markdown tables** for findings -- never ASCII box-drawing characters or per-finding horizontal-rule separators between entries (the report-level `---` before the verdict is still required)
 - **Severity-grouped sections** -- `### P0 -- Critical`, `### P1 -- High`, `### P2 -- Moderate`, `### P3 -- Low`. Omit empty severity levels.
 - **Always include file:line location** for code review issues
 - **Reviewer column** shows which persona(s) flagged the issue. Multiple reviewers = cross-reviewer agreement.
 - **Confidence column** shows the finding's confidence score
 - **Route column** shows the synthesized handling decision as ``<autofix_class> -> <owner>``.
 - **Header includes** scope, intent, and reviewer team with per-conditional justifications
-- **Mode line** -- include `interactive`, `autofix`, or `report-only`
+- **Mode line** -- include `interactive`, `autofix`, `report-only`, or `headless`
 - **Applied Fixes section** -- include only when a fix phase ran in this review invocation
 - **Residual Actionable Work section** -- include only when unresolved actionable findings were handed off for later work
 - **Pre-existing section** -- separate table, no confidence column (these are informational)
@@ -113,3 +134,15 @@ Use this **exact format** when presenting synthesized review findings. Findings 
 - **Summary uses blockquotes** for verdict, reasoning, and fix order
 - **Horizontal rule** (`---`) separates findings from verdict
 - **`###` headers** for each section -- never plain text headers
+
+## Headless Mode Format
+
+In `mode:headless`, replace the interactive pipe-delimited table report with a structured text envelope. The headless format is defined in the `### Headless output format` section of SKILL.md. Key differences from the interactive format:
+
+- **No pipe-delimited tables.** Findings use `[severity][autofix_class -> owner] File: <file:line> -- <title>` line format with indented Why/Evidence/Suggested fix lines.
+- **Findings grouped by autofix_class** (gated-auto, manual, advisory) instead of severity. Within each group, findings are sorted by severity.
+- **Verdict in header** (top of output) instead of bottom, so programmatic callers get it first.
+- **`Artifact:` line** in metadata header gives callers the path to the full run artifact.
+- **`[needs-verification]` marker** on findings where `requires_verification: true`.
+- **Evidence lines** included per finding.
+- **Completion signal:** "Review complete" as the final line.

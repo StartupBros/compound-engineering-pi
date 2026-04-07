@@ -1,7 +1,6 @@
 ---
-name: ce:compound
+name: ce-compound
 description: Document a recently solved problem to compound your team's knowledge
-argument-hint: "[optional: brief context about the fix]"
 ---
 
 # /compound
@@ -42,9 +41,9 @@ Compact-safe mode exists as a lightweight alternative — see the **Compact-Safe
 ### Full Mode
 
 <critical_requirement>
-**Only ONE file gets written - the final documentation.**
+**The primary output is ONE file - the final documentation.**
 
-Phase 1 subagents return TEXT DATA to the orchestrator. They must NOT use Write, Edit, or create any files. Only the orchestrator (Phase 2) writes the final documentation file.
+Phase 1 subagents return TEXT DATA to the orchestrator. They must NOT use Write, Edit, or create any files. Only the orchestrator writes files: the solution doc in Phase 2, and — if the Discoverability Check finds a gap — a small edit to a project instruction file (AGENTS.md or CLAUDE.md). The instruction-file edit is maintenance, not a second deliverable; it ensures future agents can discover the knowledge store.
 </critical_requirement>
 
 ### Phase 0.5: Auto Memory Scan
@@ -76,24 +75,24 @@ Launch these subagents IN PARALLEL. Each returns text data to the orchestrator.
 
 #### 1. **Context Analyzer**
    - Extracts conversation history
-   - Identifies problem type, component, symptoms
-   - Incorporates auto memory excerpts (if provided by the orchestrator) as supplementary evidence when identifying problem type, component, and symptoms
-   - Reads `references/schema.yaml` for enum validation
+   - Reads `references/schema.yaml` for enum validation and **track classification**
+   - Determines the track (bug or knowledge) from the problem_type
+   - Identifies problem type, component, and track-appropriate fields:
+     - **Bug track**: symptoms, root_cause, resolution_type
+     - **Knowledge track**: applies_when (symptoms/root_cause/resolution_type optional)
+   - Incorporates auto memory excerpts (if provided by the orchestrator) as supplementary evidence
    - Reads `references/yaml-schema.md` for category mapping into `docs/solutions/`
    - Suggests a filename using the pattern `[sanitized-problem-slug]-[date].md`
-   - Returns: YAML frontmatter skeleton (must include `category:` field mapped from problem_type), category directory path, and suggested filename
+   - Returns: YAML frontmatter skeleton (must include `category:` field mapped from problem_type), category directory path, suggested filename, and which track applies
    - Does not invent enum values, categories, or frontmatter fields from memory; reads the schema and mapping files above
+   - Does not force bug-track fields onto knowledge-track learnings or vice versa
 
 #### 2. **Solution Extractor**
-   - Analyzes all investigation steps
-   - Identifies root cause
-   - Extracts working solution with code examples
+   - Reads `references/schema.yaml` for track classification (bug vs knowledge)
+   - Adapts output structure based on the problem_type track
    - Incorporates auto memory excerpts (if provided by the orchestrator) as supplementary evidence -- conversation history and the verified fix take priority; if memory notes contradict the conversation, note the contradiction as cautionary context
-   - Develops prevention strategies and best practices guidance
-   - Generates test cases if applicable
-   - Returns: Solution content block including prevention section
 
-   **Expected output sections (follow this structure):**
+   **Bug track output sections:**
 
    - **Problem**: 1-2 sentence description of the issue
    - **Symptoms**: Observable symptoms (error messages, behavior)
@@ -101,6 +100,14 @@ Launch these subagents IN PARALLEL. Each returns text data to the orchestrator.
    - **Solution**: The actual fix with code examples (before/after when applicable)
    - **Why This Works**: Root cause explanation and why the solution addresses it
    - **Prevention**: Strategies to avoid recurrence, best practices, and test cases. Include concrete code examples where applicable (e.g., gem configurations, test assertions, linting rules)
+
+   **Knowledge track output sections:**
+
+   - **Context**: What situation, gap, or friction prompted this guidance
+   - **Guidance**: The practice, pattern, or recommendation with code examples when useful
+   - **Why This Matters**: Rationale and impact of following or not following this guidance
+   - **When to Apply**: Conditions or situations where this applies
+   - **Examples**: Concrete before/after or usage examples showing the practice in action
 
 #### 3. **Related Docs Finder**
    - Searches `docs/solutions/` for related documentation
@@ -211,6 +218,40 @@ Do not invoke `ce:compound-refresh` without an argument unless the user explicit
 
 Always capture the new learning first. Refresh is a targeted maintenance follow-up, not a prerequisite for documentation.
 
+### Discoverability Check
+
+After the learning is written and the refresh decision is made, check whether the project's instruction files would lead an agent to discover and search `docs/solutions/` before starting work in a documented area. This runs every time — the knowledge store only compounds value when agents can find it.
+
+1. Identify which root-level instruction files exist (AGENTS.md, CLAUDE.md, or both). Read the file(s) and determine which holds the substantive content — one file may just be a shim that `@`-includes the other (e.g., `CLAUDE.md` containing only `@AGENTS.md`, or vice versa). The substantive file is the assessment and edit target; ignore shims. If neither file exists, skip this check entirely.
+2. Assess whether an agent reading the instruction files would learn three things:
+   - That a searchable knowledge store of documented solutions exists
+   - Enough about its structure to search effectively (category organization, YAML frontmatter fields like `module`, `tags`, `problem_type`)
+   - When to search it (before implementing features, debugging issues, or making decisions in documented areas — learnings may cover bugs, best practices, workflow patterns, or other institutional knowledge)
+
+   This is a semantic assessment, not a string match. The information could be a line in an architecture section, a bullet in a gotchas section, spread across multiple places, or expressed without ever using the exact path `docs/solutions/`. Use judgment — if an agent would reasonably discover and use the knowledge store after reading the file, the check passes.
+
+3. If the spirit is already met, no action needed — move on.
+4. If not:
+   a. Based on the file's existing structure, tone, and density, identify where a mention fits naturally. Before creating a new section, check whether the information could be a single line in the closest related section — an architecture tree, a directory listing, a documentation section, or a conventions block. A line added to an existing section is almost always better than a new headed section. Only add a new section as a last resort when the file has clear sectioned structure and nothing is even remotely related.
+   b. Draft the smallest addition that communicates the three things. Match the file's existing style and density. The addition should describe the knowledge store itself, not the plugin — an agent without the plugin should still find value in it.
+
+      Keep the tone informational, not imperative. Express timing as description, not instruction — "relevant when implementing or debugging in documented areas" rather than "check before implementing or debugging." Imperative directives like "always search before implementing" cause redundant reads when a workflow already includes a dedicated search step. The goal is awareness: agents learn the folder exists and what's in it, then use their own judgment about when to consult it.
+
+      Examples of calibration (not templates — adapt to the file):
+
+      When there's an existing directory listing or architecture section — add a line:
+      ```
+      docs/solutions/  # documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type)
+      ```
+
+      When nothing in the file is a natural fit — a small headed section is appropriate:
+      ```
+      ## Documented Solutions
+
+      `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
+      ```
+   c. In full mode, explain to the user why this matters — agents working in this repo (including fresh sessions, other tools, or collaborators without the plugin) won't know to check `docs/solutions/` unless the instruction file surfaces it. Show the proposed change and where it would go, then use the platform's blocking question tool (`ask_user_question` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini) to get consent before making the edit. If no question tool is available, present the proposal and wait for the user's reply. In compact-safe mode, output a one-liner note and move on
+
 ### Phase 3: Optional Enhancement
 
 **WAIT for Phase 2 to complete before proceeding.**
@@ -239,14 +280,12 @@ When context budget is tight, this mode skips parallel subagents entirely. The o
 
 The orchestrator (main conversation) performs ALL of the following in one sequential pass:
 
-1. **Extract from conversation**: Identify the problem, root cause, and solution from conversation history. Also read MEMORY.md from the auto memory directory if it exists -- use any relevant notes as supplementary context alongside conversation history. Tag any memory-sourced content incorporated into the final doc with "(auto memory [claude])"
-2. **Classify**: Read `references/schema.yaml` and `references/yaml-schema.md`, then determine category and filename from them
-3. **Write minimal doc**: Create `docs/solutions/[category]/[filename].md` using `assets/resolution-template.md` as the base structure, with:
-   - YAML frontmatter (title, category, date, tags)
-   - Problem description (1-2 sentences)
-   - Root cause (1-2 sentences)
-   - Solution with key code snippets
-   - One prevention tip
+1. **Extract from conversation**: Identify the problem and solution from conversation history. Also read MEMORY.md from the auto memory directory if it exists -- use any relevant notes as supplementary context alongside conversation history. Tag any memory-sourced content incorporated into the final doc with "(auto memory [claude])"
+2. **Classify**: Read `references/schema.yaml` and `references/yaml-schema.md`, then determine track (bug vs knowledge), category, and filename
+3. **Write minimal doc**: Create `docs/solutions/[category]/[filename].md` using the appropriate track template from `assets/resolution-template.md`, with:
+   - YAML frontmatter with track-appropriate fields
+   - Bug track: Problem, root cause, solution with key code snippets, one prevention tip
+   - Knowledge track: Context, guidance with key examples, one applicability note
 4. **Skip specialized agent reviews** (Phase 3) to conserve context
 
 **Compact-safe output:**
@@ -255,6 +294,10 @@ The orchestrator (main conversation) performs ALL of the following in one sequen
 
 File created:
 - docs/solutions/[category]/[filename].md
+
+[If discoverability check found instruction files don't surface the knowledge store:]
+Tip: Your AGENTS.md/CLAUDE.md doesn't surface docs/solutions/ to agents —
+a brief mention helps all agents discover these learnings.
 
 Note: This was created in compact-safe mode. For richer documentation
 (cross-references, detailed prevention strategies, specialized reviews),
@@ -314,7 +357,7 @@ In compact-safe mode, the overlap check is skipped (no Related Docs Finder subag
 |----------|-----------|
 | Subagents write files like `context-analysis.md`, `solution-draft.md` | Subagents return text data; orchestrator writes one final file |
 | Research and assembly run in parallel | Research completes → then assembly runs |
-| Multiple files created during workflow | One file written or updated: `docs/solutions/[category]/[filename].md` |
+| Multiple files created during workflow | One solution doc written or updated: `docs/solutions/[category]/[filename].md` (plus an optional small edit to a project instruction file for discoverability) |
 | Creating a new doc when an existing doc covers the same problem | Check overlap assessment; update the existing doc when overlap is high |
 
 ## Success Output
@@ -348,6 +391,8 @@ What's next?
 4. View documentation
 5. Other
 ```
+
+**After displaying the success output, present the "What's next?" options using the platform's blocking question tool** (`ask_user_question` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the numbered options and wait for the user's reply before proceeding. Do not continue the workflow or end the turn without the user's selection.
 
 **Alternate output (when updating an existing doc due to high overlap):**
 
@@ -419,3 +464,7 @@ Based on problem type, these agents can enhance documentation:
 
 - `/research [topic]` - Deep investigation (searches docs/solutions/ for patterns)
 - `/ce-plan` - Planning workflow (references documented solutions)
+## Pi + MCPorter note
+For MCP access in Pi, use MCPorter via the generated tools:
+- `mcporter_list` to inspect available MCP tools
+- `mcporter_call` to invoke a tool

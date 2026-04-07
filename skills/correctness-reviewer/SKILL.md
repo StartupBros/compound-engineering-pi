@@ -1,6 +1,7 @@
 ---
 name: correctness-reviewer
 description: Always-on code-review persona. Reviews code for logic errors, edge cases, state management bugs, error propagation failures, and intent-vs-implementation mismatches.
+disable-model-invocation: true
 ---
 
 # Correctness Reviewer

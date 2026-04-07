@@ -31,7 +31,7 @@ import { DynamicBorder, BorderedLoader } from "@mariozechner/pi-coding-agent";
 import {
 	Container,
 	fuzzyFilter,
-	getEditorKeybindings,
+	getKeybindings,
 	Input,
 	type SelectItem,
 	SelectList,
@@ -1368,11 +1368,12 @@ ${localReviewConfigInstruction}
 - Run these reviewers in parallel when available and relevant: ${parallelReviewers.map((reviewer) => `\`${reviewer}\``).join(", ")}.
 - Always include \`agent-native-reviewer\` for agent-accessibility parity and \`learnings-researcher\` to search existing \`docs/solutions/\` / prior learnings relevant to this diff.
 - If the diff touches \`packages/\` or shared framework files, also run \`makerkit-boilerplate-reviewer\`.
+- If the diff touches CLI command definitions, argument parsing, or command handlers, also run \`cli-readiness-reviewer\`.
+- If you are reviewing a PR with existing review comments or threads, also run \`previous-comments-reviewer\`.
 - If the diff touches migrations, schema files, or data backfills, also run \`schema-drift-detector\`, \`data-migration-expert\`, and \`deployment-verification-agent\`.
 - If one of the suggested reviewer skills is unavailable, continue with the available ones and note the missing reviewer briefly in your final synthesis.
 - Review the existing todo markdown files above before finalizing findings. Avoid duplicating an already-open todo unless the new issue is materially different or meaningfully more specific.
-- Use the \`ce_todo\` tool as the source of truth for todo creation and updates during this review. Do **not** rely on the final prose report to create todos.
-- For every actionable finding that is not already tracked, create or update a pending markdown todo via \`ce_todo\` before returning your final human summary.
+- Do **not** create or update CE todo files during this review run. Return the findings in the final review report only.
 - After the parallel reviewer outputs return, inspect the most relevant files yourself and produce one final synthesized review.
 - Final output must be a concise review report with findings and verdict, not a work log.
 `;
@@ -1590,6 +1591,10 @@ export default function reviewExtension(pi: ExtensionAPI) {
 			};
 		}
 
+		if (await hasUncommittedChanges(pi)) {
+			return { target: { type: "uncommitted" }, resolutionReason: "local working tree changes" };
+		}
+
 		const currentBranchPr = await getCurrentBranchPrInfo(pi);
 		if (currentBranchPr) {
 			return {
@@ -1653,10 +1658,6 @@ export default function reviewExtension(pi: ExtensionAPI) {
 					};
 				}
 			}
-		}
-
-		if (await hasUncommittedChanges(pi)) {
-			return { target: { type: "uncommitted" }, resolutionReason: "local working tree changes" };
 		}
 
 		const [latestCommit] = await getRecentCommits(pi, 1);
@@ -1952,16 +1953,16 @@ export default function reviewExtension(pi: ExtensionAPI) {
 					container.invalidate();
 				},
 				handleInput(data: string) {
-					const kb = getEditorKeybindings();
+					const kb = getKeybindings();
 					if (
-						kb.matches(data, "selectUp") ||
-						kb.matches(data, "selectDown") ||
-						kb.matches(data, "selectConfirm") ||
-						kb.matches(data, "selectCancel")
+						kb.matches(data, "tui.select.up") ||
+						kb.matches(data, "tui.select.down") ||
+						kb.matches(data, "tui.select.confirm") ||
+						kb.matches(data, "tui.select.cancel")
 					) {
 						if (selectList) {
 							selectList.handleInput(data);
-						} else if (kb.matches(data, "selectCancel")) {
+						} else if (kb.matches(data, "tui.select.cancel")) {
 							done(null);
 						}
 						tui.requestRender();
@@ -2059,16 +2060,16 @@ export default function reviewExtension(pi: ExtensionAPI) {
 					container.invalidate();
 				},
 				handleInput(data: string) {
-					const kb = getEditorKeybindings();
+					const kb = getKeybindings();
 					if (
-						kb.matches(data, "selectUp") ||
-						kb.matches(data, "selectDown") ||
-						kb.matches(data, "selectConfirm") ||
-						kb.matches(data, "selectCancel")
+						kb.matches(data, "tui.select.up") ||
+						kb.matches(data, "tui.select.down") ||
+						kb.matches(data, "tui.select.confirm") ||
+						kb.matches(data, "tui.select.cancel")
 					) {
 						if (selectList) {
 							selectList.handleInput(data);
-						} else if (kb.matches(data, "selectCancel")) {
+						} else if (kb.matches(data, "tui.select.cancel")) {
 							done(null);
 						}
 						tui.requestRender();
@@ -2616,20 +2617,6 @@ export default function reviewExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerCommand("ce-review", {
-		description: "Alias for /ce:review",
-		handler: async (args, ctx) => {
-			await runCeReviewCommand(args, ctx);
-		},
-	});
-
-	pi.registerCommand("workflows-review", {
-		description: "Legacy alias for /ce:review",
-		handler: async (args, ctx) => {
-			ctx.ui.notify("/workflows-review is legacy; running canonical /ce:review", "info");
-			await runCeReviewCommand(args, ctx);
-		},
-	});
 
 	pi.registerCommand("workflows:review", {
 		description: "Deprecated alias for /ce:review",

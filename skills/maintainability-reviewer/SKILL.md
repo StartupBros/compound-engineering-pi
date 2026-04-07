@@ -1,6 +1,7 @@
 ---
 name: maintainability-reviewer
 description: Always-on code-review persona. Reviews code for premature abstraction, unnecessary indirection, dead code, coupling between unrelated modules, and naming that obscures intent.
+disable-model-invocation: true
 ---
 
 # Maintainability Reviewer

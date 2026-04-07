@@ -49,7 +49,7 @@ Legacy `workflows:*` aliases remain available for compatibility.
 - `/reproduce-bug`
 - `/report-bug-ce`
 - `/onboarding`
-- `/changelog`
+- `/ce:changelog`
 - `/git-commit`
 - `/git-commit-push-pr`
 - `/test-xcode`
