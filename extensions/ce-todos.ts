@@ -19,6 +19,10 @@ const StatusEnum = Type.Union([
   Type.Literal("ready"),
   Type.Literal("complete"),
   Type.Literal("wont_fix"),
+  Type.Literal("in_progress"),
+  Type.Literal("blocked"),
+  Type.Literal("done"),
+  Type.Literal("closed"),
 ]);
 
 const PriorityEnum = Type.String({
@@ -31,6 +35,16 @@ function normalizePriority(value: string | undefined): CeTodoPriority | undefine
   if (normalized === "p0" || normalized === "p1" || normalized === "critical" || normalized === "high") return "p1";
   if (normalized === "p2" || normalized === "medium") return "p2";
   if (normalized === "p3" || normalized === "low") return "p3";
+  return undefined;
+}
+
+function normalizeStatusFilter(value: string | undefined): CeTodoStatus | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "pending" || normalized === "blocked") return "pending";
+  if (normalized === "ready" || normalized === "in_progress") return "ready";
+  if (normalized === "complete" || normalized === "done" || normalized === "closed") return "complete";
+  if (normalized === "wont_fix" || normalized === "wont-fix") return "wont_fix";
   return undefined;
 }
 
@@ -77,8 +91,11 @@ export default function ceTodosExtension(pi: ExtensionAPI) {
         switch (params.action) {
           case "list": {
             const todos = await listCeTodos(ctx.cwd);
-            const filtered = params.statuses?.length
-              ? todos.filter((todo) => params.statuses?.includes(todo.status))
+            const normalizedStatuses = params.statuses
+              ?.map((status) => normalizeStatusFilter(status))
+              .filter((status): status is CeTodoStatus => Boolean(status));
+            const filtered = normalizedStatuses?.length
+              ? todos.filter((todo) => normalizedStatuses.includes(todo.status))
               : todos;
             return {
               content: [{ type: "text", text: serializeCeTodoList(filtered) }],

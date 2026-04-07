@@ -251,6 +251,32 @@ async function ensureTodoDir(cwd: string): Promise<string> {
   return dir;
 }
 
+async function withTodoLock<T>(cwd: string, work: () => Promise<T>): Promise<T> {
+  const dir = await ensureTodoDir(cwd);
+  const lockDir = path.join(dir, ".ce-todo-lock");
+  const deadline = Date.now() + 5000;
+
+  while (true) {
+    try {
+      await fs.mkdir(lockDir);
+      break;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST") throw error;
+      if (Date.now() >= deadline) {
+        throw new Error("Timed out waiting for CE todo lock");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  try {
+    return await work();
+  } finally {
+    await fs.rm(lockDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 export async function listCeTodos(cwd: string): Promise<CeTodoRecord[]> {
   const dir = await ensureTodoDir(cwd);
   const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
@@ -306,44 +332,46 @@ function buildProvenanceFrontmatter(context: CeWorkflowContext | null): Record<s
 }
 
 export async function createCeTodo(cwd: string, input: CeTodoCreateInput): Promise<{ todo: CeTodoRecord; created: boolean; duplicateOf?: string }> {
-  const todos = await listCeTodos(cwd);
-  const normalizedTitle = normalizeKey(input.title);
-  const existing = input.dedupe !== false
-    ? todos.find((todo) => todo.status !== "complete" && todo.status !== "wont_fix" && normalizeKey(todo.title) === normalizedTitle)
-    : undefined;
-  if (existing) {
-    return { todo: existing, created: false, duplicateOf: existing.relativePath };
-  }
+  return withTodoLock(cwd, async () => {
+    const todos = await listCeTodos(cwd);
+    const normalizedTitle = normalizeKey(input.title);
+    const existing = input.dedupe !== false
+      ? todos.find((todo) => todo.status !== "complete" && todo.status !== "wont_fix" && normalizeKey(todo.title) === normalizedTitle)
+      : undefined;
+    if (existing) {
+      return { todo: existing, created: false, duplicateOf: existing.relativePath };
+    }
 
-  const dir = await ensureTodoDir(cwd);
-  const nextId = String(
-    todos.reduce((max, todo) => Math.max(max, Number.parseInt(todo.issueId, 10) || 0), 0) + 1,
-  ).padStart(3, "0");
-  const fileName = `${nextId}-pending-${input.priority}-${slugify(input.title)}.md`;
-  const filePath = path.join(dir, fileName);
-  const context = await loadCeWorkflowContext(cwd);
-  const frontmatter: Record<string, string | string[]> = {
-    status: "pending",
-    priority: input.priority,
-    issue_id: nextId,
-    tags: Array.from(new Set(["code-review", "compound-engineering", ...ensureArray(input.tags)])),
-    dependencies: ensureArray(input.dependencies),
-    ...buildProvenanceFrontmatter(context),
-  };
+    const dir = await ensureTodoDir(cwd);
+    const nextId = String(
+      todos.reduce((max, todo) => Math.max(max, Number.parseInt(todo.issueId, 10) || 0), 0) + 1,
+    ).padStart(3, "0");
+    const fileName = `${nextId}-pending-${input.priority}-${slugify(input.title)}.md`;
+    const filePath = path.join(dir, fileName);
+    const context = await loadCeWorkflowContext(cwd);
+    const frontmatter: Record<string, string | string[]> = {
+      status: "pending",
+      priority: input.priority,
+      issue_id: nextId,
+      tags: Array.from(new Set(["code-review", "compound-engineering", ...ensureArray(input.tags)])),
+      dependencies: ensureArray(input.dependencies),
+      ...buildProvenanceFrontmatter(context),
+    };
 
-  const workLog = buildWorkLogEntry({
-    title: input.workLogTitle ?? "Created from review",
-    actor: input.actor,
-    actions: input.workLogActions ?? ["Created pending todo from Compound Engineering review finding"],
-    learnings: input.workLogLearnings,
+    const workLog = buildWorkLogEntry({
+      title: input.workLogTitle ?? "Created from review",
+      actor: input.actor,
+      actions: input.workLogActions ?? ["Created pending todo from Compound Engineering review finding"],
+      learnings: input.workLogLearnings,
+    });
+
+    const body = renderSections(input.title.trim(), { ...input, workLog }, workLog);
+    const markdown = serializeFrontmatter(frontmatter) + body;
+    await fs.writeFile(filePath, markdown, "utf8");
+    const todo = await getCeTodo(cwd, normalizeSlashes(path.relative(cwd, filePath)));
+    if (!todo) throw new Error("Failed to read created CE todo");
+    return { todo, created: true };
   });
-
-  const body = renderSections(input.title.trim(), { ...input, workLog }, workLog);
-  const markdown = serializeFrontmatter(frontmatter) + body;
-  await fs.writeFile(filePath, markdown, "utf8");
-  const todo = await getCeTodo(cwd, normalizeSlashes(path.relative(cwd, filePath)));
-  if (!todo) throw new Error("Failed to read created CE todo");
-  return { todo, created: true };
 }
 
 export async function updateCeTodo(cwd: string, idOrPath: string, patch: CeTodoUpdateInput): Promise<CeTodoRecord> {
