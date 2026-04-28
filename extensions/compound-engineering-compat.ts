@@ -101,6 +101,17 @@ function hasInstalledPiSubagents(baseDir: string): boolean {
     // ignore runtime environments without process metadata
   }
 
+  const settingsPath = path.join(os.homedir(), ".pi", "agent", "settings.json")
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")) as { packages?: Array<string | { source?: string }> }
+    for (const entry of settings.packages ?? []) {
+      const source = typeof entry === "string" ? entry : entry.source
+      if (source && /(^|[/:])pi-subagents($|[@/])/.test(source)) return true
+    }
+  } catch {
+    // settings parsing is best-effort only
+  }
+
   let current = path.resolve(baseDir)
   while (true) {
     checkPaths.push(path.join(current, ".pi", "npm", "node_modules", "pi-subagents", "package.json"))
@@ -205,16 +216,31 @@ class MultiSelectQuestionComponent {
   private customAnswer: string | null = null
   private awaitingCustomAnswer = false
   private resolved = false
+  private question: string
+  private options: string[]
+  private allowCustom: boolean
+  private tui: TUI
+  private theme: Theme
+  private promptForCustomAnswer: () => Promise<string | null>
+  private done: (result: MultiSelectPromptResult | null) => void
 
   constructor(
-    private question: string,
-    private options: string[],
-    private allowCustom: boolean,
-    private tui: TUI,
-    private theme: Theme,
-    private promptForCustomAnswer: () => Promise<string | null>,
-    private done: (result: MultiSelectPromptResult | null) => void,
-  ) {}
+    question: string,
+    options: string[],
+    allowCustom: boolean,
+    tui: TUI,
+    theme: Theme,
+    promptForCustomAnswer: () => Promise<string | null>,
+    done: (result: MultiSelectPromptResult | null) => void,
+  ) {
+    this.question = question
+    this.options = options
+    this.allowCustom = allowCustom
+    this.tui = tui
+    this.theme = theme
+    this.promptForCustomAnswer = promptForCustomAnswer
+    this.done = done
+  }
 
   invalidate(): void {}
 

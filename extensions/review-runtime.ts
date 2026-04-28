@@ -2617,6 +2617,20 @@ export default function reviewExtension(pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("ce-review", {
+		description: "Alias for /ce:review",
+		handler: async (args, ctx) => {
+			await runCeReviewCommand(args, ctx);
+		},
+	});
+
+	pi.registerCommand("ce-code-review", {
+		description: "Alias for /ce:review using the latest upstream CE naming",
+		handler: async (args, ctx) => {
+			await runCeReviewCommand(args, ctx);
+		},
+	});
+
 
 	pi.registerCommand("workflows:review", {
 		description: "Deprecated alias for /ce:review",

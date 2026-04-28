@@ -1,11 +1,15 @@
-import { mkdtemp, rm, cp } from "fs/promises"
+import { access, mkdtemp, rm, cp } from "fs/promises"
 import os from "os"
 import path from "path"
 
 const repoRoot = path.resolve(import.meta.dir, "..")
+const defaultCacheSource = path.join(os.homedir(), ".cache", "checkouts", "github.com", "EveryInc", "compound-engineering-plugin")
+const siblingSource = path.resolve(repoRoot, "../compound-engineering-plugin")
 const sourceRoot = process.env.COMPOUND_PLUGIN_SOURCE
   ? path.resolve(process.env.COMPOUND_PLUGIN_SOURCE)
-  : path.resolve(repoRoot, "../compound-engineering-plugin")
+  : await pathExists(defaultCacheSource)
+    ? defaultCacheSource
+    : siblingSource
 
 const sourcePluginDir = path.join(sourceRoot, "plugins", "compound-engineering")
 const targetPluginDir = path.join(repoRoot, "plugins", "compound-engineering")
@@ -25,6 +29,7 @@ try {
 
   const generatedPiRoot = path.join(generatedRoot, ".pi")
   const generatedSkillsDir = path.join(generatedPiRoot, "skills")
+  const generatedAgentsDir = path.join(generatedPiRoot, "agents")
   const generatedMcporterPath = path.join(generatedPiRoot, "compound-engineering", "mcporter.json")
 
   console.log(`Syncing vendored plugin snapshot from ${sourcePluginDir}`)
@@ -33,10 +38,21 @@ try {
   console.log(`Syncing generated Pi skills from ${generatedSkillsDir}`)
   await replaceDir(path.join(repoRoot, "skills"), generatedSkillsDir)
 
-  console.log(`Syncing bundled MCPorter config from ${generatedMcporterPath}`)
-  await copyFileToPath(generatedMcporterPath, path.join(repoRoot, "pi-resources", "compound-engineering", "mcporter.json"))
+  if (await pathExists(generatedAgentsDir)) {
+    console.log(`Syncing generated Pi agents from ${generatedAgentsDir}`)
+    await replaceDir(path.join(repoRoot, "agents"), generatedAgentsDir)
+  } else {
+    console.log("No generated Pi agents found; preserving existing agents directory if present.")
+  }
 
-  console.log("Done. Note: prompts/ and extensions/ are preserved for Pi-specific compatibility and docs.")
+  if (await pathExists(generatedMcporterPath)) {
+    console.log(`Syncing bundled MCPorter config from ${generatedMcporterPath}`)
+    await copyFileToPath(generatedMcporterPath, path.join(repoRoot, "pi-resources", "compound-engineering", "mcporter.json"))
+  } else {
+    console.log("No generated MCPorter config found; preserving existing bundled config.")
+  }
+
+  console.log("Done. Note: prompts/, extensions/, and Pi-native runtime files are preserved.")
 } finally {
   await rm(generatedRoot, { recursive: true, force: true })
 }
@@ -63,4 +79,13 @@ async function replaceDir(target: string, source: string) {
 async function copyFileToPath(source: string, target: string) {
   await rm(target, { force: true })
   await cp(source, target)
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath)
+    return true
+  } catch {
+    return false
+  }
 }

@@ -3,7 +3,7 @@ name: ce-compound
 description: Document a recently solved problem to compound your team's knowledge
 ---
 
-# /compound
+# /ce-compound
 
 Coordinate multiple subagents working in parallel to document a recently solved problem.
 
@@ -20,6 +20,14 @@ Captures problem solutions while context is fresh, creating structured documenta
 /ce-compound [brief context]    # Provide additional context hint
 ```
 
+## Pre-resolved context
+
+**Repo name (pre-resolved):** !`git rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed -E 's|/\.git/?$||; s|.*/||'`
+
+**Git branch (pre-resolved):** !`git rev-parse --abbrev-ref HEAD 2>/dev/null`
+
+If the lines above resolved to plain values (a folder name like `my-repo` and a branch name like `feat/my-branch`), pass them into the Session Historian dispatch in Phase 1 so the agent does not waste a turn deriving them. If they still contain backtick command strings or are empty, omit them from the dispatch and let the agent derive them at runtime.
+
 ## Support Files
 
 These files are the durable contract for the workflow. Read them on-demand at the step that needs them — do not bulk-load at skill start.
@@ -32,9 +40,30 @@ When spawning subagents, pass the relevant file contents into the task prompt so
 
 ## Execution Strategy
 
-**Always run full mode by default.** Proceed directly to Phase 1 unless the user explicitly requests compact-safe mode (e.g., `/ce-compound --compact` or "use compact mode").
+Present the user with two options before proceeding, using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
 
-Compact-safe mode exists as a lightweight alternative — see the **Compact-Safe Mode** section below. It's there if the user wants it, not something to push.
+```
+1. Full (recommended) — the complete compound workflow. Researches,
+   cross-references, and reviews your solution to produce documentation
+   that compounds your team's knowledge.
+
+2. Lightweight — same documentation, single pass. Faster and uses
+   fewer tokens, but won't detect duplicates or cross-reference
+   existing docs. Best for simple fixes or long sessions nearing
+   context limits.
+```
+
+Do NOT pre-select a mode. Do NOT skip this prompt. Wait for the user's choice before proceeding.
+
+**If the user chooses Full**, ask one follow-up question before proceeding. Detect which harness is running (Claude Code, Codex, or Cursor) and ask:
+
+```
+Would you also like to search your [harness name] session history
+for relevant knowledge to help the Compound process? This adds
+time and token usage.
+```
+
+If the user says yes, dispatch the Session Historian in Phase 1. If no, skip it. Do not ask this in lightweight mode.
 
 ---
 
@@ -48,10 +77,10 @@ Phase 1 subagents return TEXT DATA to the orchestrator. They must NOT use Write,
 
 ### Phase 0.5: Auto Memory Scan
 
-Before launching Phase 1 subagents, check the auto memory directory for notes relevant to the problem being documented.
+Before launching Phase 1 subagents, check the auto-memory block injected into your system prompt for notes relevant to the problem being documented.
 
-1. Read MEMORY.md from the auto memory directory (the path is known from the system prompt context)
-2. If the directory or MEMORY.md does not exist, is empty, or is unreadable, skip this step and proceed to Phase 1 unchanged
+1. Look for a block labeled "user's auto-memory" (Claude Code only) already present in your system prompt context — MEMORY.md's entries are inlined there
+2. If the block is absent, empty, or this is a non-Claude-Code platform, skip this step and proceed to Phase 1 unchanged
 3. Scan the entries for anything related to the problem being documented -- use semantic judgment, not keyword matching
 4. If relevant entries are found, prepare a labeled excerpt block:
 
@@ -67,11 +96,16 @@ and codebase findings take priority over these notes.
 
 If no relevant entries are found, proceed to Phase 1 without passing memory context.
 
-### Phase 1: Parallel Research
+### Phase 1: Research
+
+Launch research subagents. Each returns text data to the orchestrator.
+
+**Dispatch order:**
+- Launch `Context Analyzer`, `Solution Extractor`, and `Related Docs Finder` in parallel (background)
+- Then dispatch `ce-session-historian` in foreground — it reads session files outside the working directory that background agents may not have access to
+- The foreground dispatch runs while the background agents work, adding no wall-clock time
 
 <parallel_tasks>
-
-Launch these subagents IN PARALLEL. Each returns text data to the orchestrator.
 
 #### 1. **Context Analyzer**
    - Extracts conversation history
@@ -140,6 +174,32 @@ Launch these subagents IN PARALLEL. Each returns text data to the orchestrator.
 
 </parallel_tasks>
 
+#### 4. **Session Historian** (foreground, after launching the above — only if the user opted in)
+   - **Skip entirely** if the user declined session history in the follow-up question
+   - Dispatched as `ce-session-historian`
+   - Dispatch in **foreground** — this agent reads session files outside the working directory (`~/.claude/projects/`, `~/.codex/sessions/`, `~/.cursor/projects/`) which background agents may not have access to
+   - Omit the `mode` parameter so the user's configured permission settings apply
+   - Dispatch on the mid-tier model (e.g., `model: "sonnet"` in Claude Code) — the synthesis feeds into compound assembly and doesn't need frontier reasoning
+
+   **Dispatch prompt — keep tight.** A long, keyword-rich prompt licenses the agent to keep widening. Use this shape:
+
+   - **Pre-resolved context** (only if values resolved cleanly above; otherwise omit and let the agent derive): repo name, current git branch.
+   - **Time window**: explicit `7 days` unless the documented problem clearly spans a longer arc.
+   - **Problem topic**: one sentence naming the concrete issue — error message, module name, what broke and how it was fixed. Not a paragraph; not a bullet list of related topics.
+   - **Filter rule (one line)**: "Only surface findings directly relevant to this specific problem. Ignore unrelated work from the same sessions or branches."
+   - **Output schema**:
+
+     ```
+     Structure your response with these sections (omit any with no findings):
+     - What was tried before
+     - What didn't work
+     - Key decisions
+     - Related context
+     ```
+
+   Do not append additional context blocks, exclusion lists, or topic-keyword bullets — verbose dispatch prompts give the agent license to keep widening the search and rapidly compound wall time. If the agent needs keyword search, it owns that decision via the `--keyword` mode on `ce-session-inventory`.
+   - Returns: structured digest of findings from prior sessions, or "no relevant prior sessions" if none found
+
 ### Phase 2: Assembly & Write
 
 <sequential_tasks>
@@ -161,10 +221,16 @@ The orchestrating agent (main conversation) performs these steps:
 
    When updating an existing doc, preserve its file path and frontmatter structure. Update the solution, code examples, prevention tips, and any stale references. Add a `last_updated: YYYY-MM-DD` field to the frontmatter. Do not change the title unless the problem framing has materially shifted.
 
-3. Assemble complete markdown file from the collected pieces, reading `assets/resolution-template.md` for the section structure of new docs
-4. Validate YAML frontmatter against `references/schema.yaml`
-5. Create directory if needed: `mkdir -p docs/solutions/[category]/`
-6. Write the file: either the updated existing doc or the new `docs/solutions/[category]/[filename].md`
+3. **Incorporate session history findings** (if available). When the Session History Researcher returned relevant prior-session context:
+   - Fold investigation dead ends and failed approaches into the **What Didn't Work** section (bug track) or **Context** section (knowledge track)
+   - Use cross-session patterns to enrich the **Prevention** or **Why This Matters** sections
+   - Tag session-sourced content with "(session history)" so its origin is clear to future readers
+   - If findings are thin or "no relevant prior sessions," proceed without session context
+4. Assemble complete markdown file from the collected pieces, reading `assets/resolution-template.md` for the section structure of new docs
+5. Validate YAML frontmatter against `references/schema.yaml`, including the YAML-safety quoting rule for array items (see `references/yaml-schema.md` > YAML Safety Rules)
+6. Create directory if needed: `mkdir -p docs/solutions/[category]/`
+7. Write the file: either the updated existing doc or the new `docs/solutions/[category]/[filename].md`
+8. **Run `python3 scripts/validate-frontmatter.py <output-path>`** to catch silent-corruption parser-safety issues that the prose rules miss: malformed `---` delimiter lines, unquoted ` #` in scalar values (silent comment truncation), and unquoted `: ` in scalar values (silent mapping confusion). Exit 0 means the doc is parser-safe; exit 1 means the script's stderr names the offending field(s) and what to fix — quote the value(s), re-write the doc, and re-run until exit 0. Do not declare success while validation fails. The script does not enforce schema rules and does not flag YAML reserved-indicator characters (those produce loud parser errors downstream rather than silent corruption — out of scope). Uses Python 3 stdlib only (no PyYAML or other deps).
 
 When creating a new doc, preserve the section order from `assets/resolution-template.md` unless the user explicitly asks for a different structure.
 
@@ -174,9 +240,9 @@ When creating a new doc, preserve the section order from `assets/resolution-temp
 
 After writing the new learning, decide whether this new solution is evidence that older docs should be refreshed.
 
-`ce:compound-refresh` is **not** a default follow-up. Use it selectively when the new learning suggests an older learning or pattern doc may now be inaccurate.
+`ce-compound-refresh` is **not** a default follow-up. Use it selectively when the new learning suggests an older learning or pattern doc may now be inaccurate.
 
-It makes sense to invoke `ce:compound-refresh` when one or more of these are true:
+It makes sense to invoke `ce-compound-refresh` when one or more of these are true:
 
 1. A related learning or pattern doc recommends an approach that the new fix now contradicts
 2. The new fix clearly supersedes an older documented solution
@@ -185,7 +251,7 @@ It makes sense to invoke `ce:compound-refresh` when one or more of these are tru
 5. The Related Docs Finder surfaced high-confidence refresh candidates in the same problem space
 6. The Related Docs Finder reported **moderate overlap** with an existing doc — there may be consolidation opportunities that benefit from a focused review
 
-It does **not** make sense to invoke `ce:compound-refresh` when:
+It does **not** make sense to invoke `ce-compound-refresh` when:
 
 1. No related docs were found
 2. Related docs still appear consistent with the new learning
@@ -194,11 +260,11 @@ It does **not** make sense to invoke `ce:compound-refresh` when:
 
 Use these rules:
 
-- If there is **one obvious stale candidate**, invoke `ce:compound-refresh` with a narrow scope hint after the new learning is written
+- If there is **one obvious stale candidate**, invoke `ce-compound-refresh` with a narrow scope hint after the new learning is written
 - If there are **multiple candidates in the same area**, ask the user whether to run a targeted refresh for that module, category, or pattern set
-- If context is already tight or you are in compact-safe mode, do not expand into a broad refresh automatically; instead recommend `ce:compound-refresh` as the next step with a scope hint
+- If context is already tight or you are in lightweight mode, do not expand into a broad refresh automatically; instead recommend `ce-compound-refresh` as the next step with a scope hint
 
-When invoking or recommending `ce:compound-refresh`, be explicit about the argument to pass. Prefer the narrowest useful scope:
+When invoking or recommending `ce-compound-refresh`, be explicit about the argument to pass. Prefer the narrowest useful scope:
 
 - **Specific file** when one learning or pattern doc is the likely stale artifact
 - **Module or component name** when several related docs may need review
@@ -214,7 +280,7 @@ Examples:
 
 A single scope hint may still expand to multiple related docs when the change is cross-cutting within one domain, category, or pattern area.
 
-Do not invoke `ce:compound-refresh` without an argument unless the user explicitly wants a broad sweep.
+Do not invoke `ce-compound-refresh` without an argument unless the user explicitly wants a broad sweep.
 
 Always capture the new learning first. Refresh is a targeted maintenance follow-up, not a prerequisite for documentation.
 
@@ -250,7 +316,7 @@ After the learning is written and the refresh decision is made, check whether th
 
       `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
       ```
-   c. In full mode, explain to the user why this matters — agents working in this repo (including fresh sessions, other tools, or collaborators without the plugin) won't know to check `docs/solutions/` unless the instruction file surfaces it. Show the proposed change and where it would go, then use the platform's blocking question tool (`ask_user_question` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini) to get consent before making the edit. If no question tool is available, present the proposal and wait for the user's reply. In compact-safe mode, output a one-liner note and move on
+   c. In full mode, explain to the user why this matters — agents working in this repo (including fresh sessions, other tools, or collaborators without the plugin) won't know to check `docs/solutions/` unless the instruction file surfaces it. Show the proposed change and where it would go, then use the platform's blocking question tool to get consent before making the edit: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting the proposal in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. In lightweight mode, output a one-liner note and move on
 
 ### Phase 3: Optional Enhancement
 
@@ -260,37 +326,40 @@ After the learning is written and the refresh decision is made, check whether th
 
 Based on problem type, optionally invoke specialized agents to review the documentation:
 
-- **performance_issue** → `performance-oracle`
-- **security_issue** → `security-sentinel`
-- **database_issue** → `data-integrity-guardian`
-- **test_failure** → `cora-test-reviewer`
-- Any code-heavy issue → `kieran-rails-reviewer` + `code-simplicity-reviewer`
+- **performance_issue** → `ce-performance-oracle`
+- **security_issue** → `ce-security-sentinel`
+- **database_issue** → `ce-data-integrity-guardian`
+- Any code-heavy issue → always run `ce-code-simplicity-reviewer`, and additionally run the kieran reviewer that matches the repo's primary stack:
+  - Ruby/Rails → also run `ce-kieran-rails-reviewer`
+  - Python → also run `ce-kieran-python-reviewer`
+  - TypeScript/JavaScript → also run `ce-kieran-typescript-reviewer`
+  - Other stacks → no kieran reviewer needed
 
 </parallel_tasks>
 
 ---
 
-### Compact-Safe Mode
+### Lightweight Mode
 
 <critical_requirement>
-**Single-pass alternative for context-constrained sessions.**
+**Single-pass alternative — same documentation, fewer tokens.**
 
-When context budget is tight, this mode skips parallel subagents entirely. The orchestrator performs all work in a single pass, producing a minimal but complete solution document.
+This mode skips parallel subagents entirely. The orchestrator performs all work in a single pass, producing the same solution document without cross-referencing or duplicate detection.
 </critical_requirement>
 
 The orchestrator (main conversation) performs ALL of the following in one sequential pass:
 
-1. **Extract from conversation**: Identify the problem and solution from conversation history. Also read MEMORY.md from the auto memory directory if it exists -- use any relevant notes as supplementary context alongside conversation history. Tag any memory-sourced content incorporated into the final doc with "(auto memory [claude])"
+1. **Extract from conversation**: Identify the problem and solution from conversation history. Also scan the "user's auto-memory" block injected into your system prompt, if present (Claude Code only) -- use any relevant notes as supplementary context alongside conversation history. Tag any memory-sourced content incorporated into the final doc with "(auto memory [claude])"
 2. **Classify**: Read `references/schema.yaml` and `references/yaml-schema.md`, then determine track (bug vs knowledge), category, and filename
 3. **Write minimal doc**: Create `docs/solutions/[category]/[filename].md` using the appropriate track template from `assets/resolution-template.md`, with:
-   - YAML frontmatter with track-appropriate fields
+   - YAML frontmatter with track-appropriate fields, applying the YAML-safety quoting rule for array items (see `references/yaml-schema.md` > YAML Safety Rules)
    - Bug track: Problem, root cause, solution with key code snippets, one prevention tip
    - Knowledge track: Context, guidance with key examples, one applicability note
 4. **Skip specialized agent reviews** (Phase 3) to conserve context
 
-**Compact-safe output:**
+**Lightweight output:**
 ```
-✓ Documentation complete (compact-safe mode)
+✓ Documentation complete (lightweight mode)
 
 File created:
 - docs/solutions/[category]/[filename].md
@@ -299,14 +368,14 @@ File created:
 Tip: Your AGENTS.md/CLAUDE.md doesn't surface docs/solutions/ to agents —
 a brief mention helps all agents discover these learnings.
 
-Note: This was created in compact-safe mode. For richer documentation
+Note: This was created in lightweight mode. For richer documentation
 (cross-references, detailed prevention strategies, specialized reviews),
-re-run /compound in a fresh session.
+re-run /ce-compound in a fresh session.
 ```
 
 **No subagents are launched. No parallel tasks. One file written.**
 
-In compact-safe mode, the overlap check is skipped (no Related Docs Finder subagent). This means compact-safe mode may create a doc that overlaps with an existing one. That is acceptable — `ce:compound-refresh` will catch it later. Only suggest `ce:compound-refresh` if there is an obvious narrow refresh target. Do not broaden into a large refresh sweep from a compact-safe session.
+In lightweight mode, the overlap check is skipped (no Related Docs Finder subagent). This means lightweight mode may create a doc that overlaps with an existing one. That is acceptable — `ce-compound-refresh` will catch it later. Only suggest `ce-compound-refresh` if there is an obvious narrow refresh target. Do not broaden into a large refresh sweep from a lightweight session.
 
 ---
 
@@ -341,6 +410,7 @@ In compact-safe mode, the overlap check is skipped (no Related Docs Finder subag
 
 **Categories auto-detected from problem:**
 
+Bug track:
 - build-errors/
 - test-failures/
 - runtime-errors/
@@ -350,6 +420,16 @@ In compact-safe mode, the overlap check is skipped (no Related Docs Finder subag
 - ui-bugs/
 - integration-issues/
 - logic-errors/
+
+Knowledge track:
+- architecture-patterns/ — architectural or structural patterns (agent/skill/pipeline/workflow shape decisions)
+- design-patterns/ — reusable non-architectural design approaches (content generation, interaction patterns, prompt shapes)
+- tooling-decisions/ — language, library, or tool choices with durable rationale
+- conventions/ — team-agreed way of doing something, captured so it survives turnover
+- workflow-issues/
+- developer-experience/
+- documentation-gaps/
+- best-practices/ — fallback only, use when no narrower knowledge-track value applies
 
 ## Common Mistakes to Avoid
 
@@ -371,12 +451,12 @@ Subagent Results:
   ✓ Context Analyzer: Identified performance_issue in brief_system, category: performance-issues/
   ✓ Solution Extractor: 3 code fixes, prevention strategies
   ✓ Related Docs Finder: 2 related issues
+  ✓ Session History: 3 prior sessions on same branch, 2 failed approaches surfaced
 
 Specialized Agent Reviews (Auto-Triggered):
-  ✓ performance-oracle: Validated query optimization approach
-  ✓ kieran-rails-reviewer: Code examples meet Rails standards
-  ✓ code-simplicity-reviewer: Solution is appropriately minimal
-  ✓ every-style-editor: Documentation style verified
+  ✓ ce-performance-oracle: Validated query optimization approach
+  ✓ ce-kieran-rails-reviewer: Code examples meet Rails conventions
+  ✓ ce-code-simplicity-reviewer: Solution is appropriately minimal
 
 File created:
 - docs/solutions/performance-issues/n-plus-one-brief-generation.md
@@ -392,7 +472,7 @@ What's next?
 5. Other
 ```
 
-**After displaying the success output, present the "What's next?" options using the platform's blocking question tool** (`ask_user_question` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the numbered options and wait for the user's reply before proceeding. Do not continue the workflow or end the turn without the user's selection.
+**After displaying the success output, present the "What's next?" options using the platform's blocking question tool:** `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. Do not continue the workflow or end the turn without the user's selection.
 
 **Alternate output (when updating an existing doc due to high overlap):**
 
@@ -441,20 +521,20 @@ Writes the final learning directly into `docs/solutions/`.
 Based on problem type, these agents can enhance documentation:
 
 ### Code Quality & Review
-- **kieran-rails-reviewer**: Reviews code examples for Rails best practices
-- **code-simplicity-reviewer**: Ensures solution code is minimal and clear
-- **pattern-recognition-specialist**: Identifies anti-patterns or repeating issues
+- **ce-kieran-rails-reviewer**: Reviews code examples for Rails best practices
+- **ce-kieran-python-reviewer**: Reviews code examples for Python best practices
+- **ce-kieran-typescript-reviewer**: Reviews code examples for TypeScript best practices
+- **ce-code-simplicity-reviewer**: Ensures solution code is minimal and clear
+- **ce-pattern-recognition-specialist**: Identifies anti-patterns or repeating issues
 
 ### Specific Domain Experts
-- **performance-oracle**: Analyzes performance_issue category solutions
-- **security-sentinel**: Reviews security_issue solutions for vulnerabilities
-- **cora-test-reviewer**: Creates test cases for prevention strategies
-- **data-integrity-guardian**: Reviews database_issue migrations and queries
+- **ce-performance-oracle**: Analyzes performance_issue category solutions
+- **ce-security-sentinel**: Reviews security_issue solutions for vulnerabilities
+- **ce-data-integrity-guardian**: Reviews database_issue migrations and queries
 
-### Enhancement & Documentation
-- **best-practices-researcher**: Enriches solution with industry best practices
-- **every-style-editor**: Reviews documentation style and clarity
-- **framework-docs-researcher**: Links to Rails/gem documentation references
+### Enhancement & Research
+- **ce-best-practices-researcher**: Enriches solution with industry best practices
+- **ce-framework-docs-researcher**: Links to framework/library documentation references
 
 ### When to Invoke
 - **Auto-triggered** (optional): Agents can run post-documentation for enhancement
@@ -464,7 +544,3 @@ Based on problem type, these agents can enhance documentation:
 
 - `/research [topic]` - Deep investigation (searches docs/solutions/ for patterns)
 - `/ce-plan` - Planning workflow (references documented solutions)
-## Pi + MCPorter note
-For MCP access in Pi, use MCPorter via the generated tools:
-- `mcporter_list` to inspect available MCP tools
-- `mcporter_call` to invoke a tool

@@ -5,91 +5,63 @@ import os from "node:os"
 
 const repoRoot = path.resolve(new URL("..", import.meta.url).pathname)
 const skillsDir = path.join(repoRoot, "skills")
-const agentsDir = path.join(os.homedir(), ".pi", "agent", "agents")
-
-const CATEGORY_SKILLS = {
-  review: new Set([
-    "agent-native-reviewer",
-    "adversarial-reviewer",
-    "api-contract-reviewer",
-    "architecture-strategist",
-    "cli-agent-readiness-reviewer",
-    "cli-readiness-reviewer",
-    "code-simplicity-reviewer",
-    "correctness-reviewer",
-    "data-integrity-guardian",
-    "data-migration-expert",
-    "data-migrations-reviewer",
-    "deployment-verification-agent",
-    "dhh-rails-reviewer",
-    "julik-frontend-races-reviewer",
-    "kieran-python-reviewer",
-    "kieran-rails-reviewer",
-    "kieran-typescript-reviewer",
-    "maintainability-reviewer",
-    "pattern-recognition-specialist",
-    "performance-oracle",
-    "performance-reviewer",
-    "previous-comments-reviewer",
-    "project-standards-reviewer",
-    "reliability-reviewer",
-    "schema-drift-detector",
-    "security-reviewer",
-    "security-sentinel",
-    "testing-reviewer",
-  ]),
-  research: new Set([
-    "best-practices-researcher",
-    "framework-docs-researcher",
-    "git-history-analyzer",
-    "issue-intelligence-analyst",
-    "learnings-researcher",
-    "repo-research-analyst",
-  ]),
-  design: new Set([
-    "design-implementation-reviewer",
-    "design-iterator",
-    "figma-design-sync",
-  ]),
-  workflow: new Set([
-    "bug-reproduction-validator",
-    "lint",
-    "pr-comment-resolver",
-    "spec-flow-analyzer",
-  ]),
-  "document-review": new Set([
-    "adversarial-document-reviewer",
-    "coherence-reviewer",
-    "design-lens-reviewer",
-    "feasibility-reviewer",
-    "product-lens-reviewer",
-    "scope-guardian-reviewer",
-    "security-lens-reviewer",
-  ]),
-  docs: new Set([
-    "ankane-readme-writer",
-  ]),
-}
+const packageAgentsDir = path.join(repoRoot, "agents")
+const targetAgentsDir = path.join(os.homedir(), ".pi", "agent", "agents")
 
 const HEADER = `# Global Compound Engineering agent wrappers
 
-These \`.md\` files make Compound Engineering skills invokable through the global \`pi-subagents\` runtime.
+These files make Compound Engineering available to the global \`pi-subagents\` runtime.
 
-Design:
-- one wrapper per CE skill directory in \`/home/will/SITES/pi-compound-engineering/skills\`
-- wrapper name matches the CE skill name
-- additional alias wrappers cover migrated names like \`Explore\`, \`Plan\`, \`general-purpose\`, \`Bash\`, and namespaced \`compound-engineering:*:*\` agent references
-- wrappers grant standard built-in tools plus inherited extension tools
-- wrappers inject the matching Pi skill via \`skill: <name>\` when a real CE skill exists
+Sources:
+- \`${packageAgentsDir}\` contains generated Pi agents converted from upstream CE agents
+- \`${skillsDir}\` contains generated Pi skills and a few Pi compatibility skills
 
-Important:
-- review-oriented wrappers intentionally keep \`edit\`/\`write\` available because CE review agents may emit markdown todo files as part of the workflow
-- generic aliases without a backing CE skill use a plain system prompt instead of \`skill:\` injection
-
-This lets migrated CE prompts and interoperability layers call those names as subagents from any repo, not just \`prbot\`.
+This script writes into \`${targetAgentsDir}\` for local dogfooding. It is intentionally a developer convenience; the package's source of truth remains this repo.
 `
 
-function wrapperBody(skillName) {
+async function ensureDir(dir) {
+  await fs.mkdir(dir, { recursive: true })
+}
+
+async function pathExists(filePath) {
+  try {
+    await fs.access(filePath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function listSkillNames() {
+  if (!(await pathExists(skillsDir))) return []
+  const entries = await fs.readdir(skillsDir, { withFileTypes: true })
+  const names = []
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (await pathExists(path.join(skillsDir, entry.name, "SKILL.md"))) {
+      names.push(entry.name)
+    }
+  }
+  return names.sort()
+}
+
+async function listGeneratedAgentFiles() {
+  if (!(await pathExists(packageAgentsDir))) return []
+  const entries = await fs.readdir(packageAgentsDir, { withFileTypes: true })
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name)
+    .sort()
+}
+
+async function writeFileIfChanged(filePath, content) {
+  const existing = await fs.readFile(filePath, "utf8").catch(() => null)
+  if (existing === content) return false
+  await fs.writeFile(filePath, content, "utf8")
+  return true
+}
+
+function skillWrapperBody(skillName) {
   return [
     "---",
     `name: ${skillName}`,
@@ -105,58 +77,57 @@ function wrapperBody(skillName) {
   ].join("\n")
 }
 
-function namespacedWrapperBody(aliasName, skillName) {
-  return [
-    "---",
-    `name: ${aliasName}`,
-    `description: Namespaced Compound Engineering alias for ${skillName}`,
-    "tools: read, bash, edit, write, grep, find, ls",
-    "thinking: medium",
-    `skill: ${skillName}`,
-    "defaultProgress: true",
-    "---",
-    `Use the injected Compound Engineering skill \`${skillName}\` to carry out the assigned task.`,
-    "Stay scoped to the request, prefer concrete evidence, and preserve the ability to write markdown todo files when the workflow calls for them.",
-    "",
-  ].join("\n")
-}
-
-async function ensureDir(dir) {
-  await fs.mkdir(dir, { recursive: true })
-}
-
-async function listSkillNames() {
-  const entries = await fs.readdir(skillsDir, { withFileTypes: true })
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
-}
-
-async function writeFileIfChanged(filePath, content) {
-  const existing = await fs.readFile(filePath, "utf8").catch(() => null)
-  if (existing === content) return false
-  await fs.writeFile(filePath, content, "utf8")
-  return true
-}
-
-async function main() {
-  await ensureDir(agentsDir)
-  let changed = 0
-
-  changed += Number(await writeFileIfChanged(path.join(agentsDir, "README.md"), HEADER))
-
-  const skillNames = await listSkillNames()
-  for (const skillName of skillNames) {
-    changed += Number(await writeFileIfChanged(path.join(agentsDir, `${skillName}.md`), wrapperBody(skillName)))
-  }
-
-  for (const [category, names] of Object.entries(CATEGORY_SKILLS)) {
-    for (const skillName of names) {
-      if (!skillNames.includes(skillName)) continue
-      const aliasName = `compound-engineering:${category}:${skillName}`
-      changed += Number(await writeFileIfChanged(path.join(agentsDir, `${aliasName}.md`), namespacedWrapperBody(aliasName, skillName)))
+function aliasAgentContent(content, aliasName) {
+  if (content.startsWith("---\n")) {
+    const end = content.indexOf("\n---\n", 4)
+    if (end !== -1) {
+      const frontmatter = content.slice(4, end)
+      const body = content.slice(end + 5)
+      const updatedFrontmatter = frontmatter.replace(/^name:\s*.+$/m, `name: ${aliasName}`)
+      return `---\n${updatedFrontmatter}\n---\n${body}`
     }
   }
 
-  console.log(`Generated/updated ${changed} wrapper files in ${agentsDir}`)
+  return [
+    "---",
+    `name: ${aliasName}`,
+    `description: Compound Engineering generated agent alias: ${aliasName}`,
+    "---",
+    content,
+  ].join("\n")
+}
+
+async function main() {
+  await ensureDir(targetAgentsDir)
+  let changed = 0
+
+  changed += Number(await writeFileIfChanged(path.join(targetAgentsDir, "README.md"), HEADER))
+
+  const generatedAgentFiles = await listGeneratedAgentFiles()
+  const generatedAgentNames = new Set(generatedAgentFiles.map((file) => file.replace(/\.md$/, "")))
+
+  for (const fileName of generatedAgentFiles) {
+    const sourcePath = path.join(packageAgentsDir, fileName)
+    const content = await fs.readFile(sourcePath, "utf8")
+    changed += Number(await writeFileIfChanged(path.join(targetAgentsDir, fileName), content))
+
+    const agentName = fileName.replace(/\.md$/, "")
+    if (agentName.startsWith("ce-")) {
+      const aliasName = agentName.slice("ce-".length)
+      changed += Number(await writeFileIfChanged(
+        path.join(targetAgentsDir, `${aliasName}.md`),
+        aliasAgentContent(content, aliasName),
+      ))
+    }
+  }
+
+  const skillNames = await listSkillNames()
+  for (const skillName of skillNames) {
+    if (generatedAgentNames.has(skillName)) continue
+    changed += Number(await writeFileIfChanged(path.join(targetAgentsDir, `${skillName}.md`), skillWrapperBody(skillName)))
+  }
+
+  console.log(`Generated/updated ${changed} wrapper files in ${targetAgentsDir}`)
 }
 
 main().catch((error) => {

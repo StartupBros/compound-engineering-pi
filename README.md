@@ -19,13 +19,13 @@ Reload your session, then you're ready:
 
 ## Quick start
 
-Open Pi in your repo and use the canonical Compound Engineering commands:
+Open Pi in your repo and use either Pi-native colon commands or latest upstream CE hyphen commands:
 
-- `/ce:brainstorm`
-- `/ce:plan`
-- `/ce:work`
-- `/ce:review`
-- `/ce:compound`
+- `/ce:brainstorm` or `/ce-brainstorm`
+- `/ce:plan` or `/ce-plan`
+- `/ce:work` or `/ce-work`
+- `/ce:review`, `/ce-review`, or `/ce-code-review`
+- `/ce:compound` or `/ce-compound`
 
 Legacy `workflows:*` aliases remain available for compatibility.
 
@@ -41,24 +41,24 @@ Legacy `workflows:*` aliases remain available for compatibility.
 - `/ce:compound`
 - `/ce:compound-refresh`
 - `/deepen-plan`
-- `/test-browser`
-- `/feature-video`
+- `/test-browser` / `/ce-test-browser`
+- `/feature-video` / `/ce-demo-reel`
 - `/todo-resolve`
 - `/todo-triage`
-- `/resolve-pr-feedback`
+- `/resolve-pr-feedback` / `/ce-resolve-pr-feedback`
 - `/reproduce-bug`
-- `/report-bug-ce`
+- `/report-bug-ce` / `/ce-report-bug`
 - `/onboarding`
-- `/ce:changelog`
-- `/git-commit`
-- `/git-commit-push-pr`
-- `/test-xcode`
+- `/ce:changelog` / `/ce-release-notes`
+- `/git-commit` / `/ce-commit`
+- `/git-commit-push-pr` / `/ce-commit-push-pr`
+- `/test-xcode` / `/ce-test-xcode`
 - `/lfg`
 - `/slfg`
 
-### Synced specialist skills
+### Synced specialist skills and agents
 
-This package includes a large set of Compound Engineering skills for review, research, design, workflow automation, browser automation, git workflows, and more.
+This package tracks upstream Compound Engineering 3.2.x content, currently bundling generated Pi skills plus generated Pi subagent definitions for review, research, design, workflow automation, git workflows, and more. A few Pi compatibility skills remain for legacy commands that are still useful locally.
 
 ### Pi compatibility layer
 
@@ -77,6 +77,7 @@ This repo intentionally keeps some behavior package-owned instead of relying onl
 - Pi-native review target resolution and todo handling
 - workflow provenance and handoff context
 - reproducible subagent wrapper generation for Pi environments
+- latest upstream `ce-*` naming while keeping Pi-friendly `/ce:*` aliases
 
 ## Optional: MCP support via MCPorter
 
@@ -99,12 +100,13 @@ This repo is not trying to fork Compound Engineering philosophically. The goal i
 
 Typical refresh flow:
 
-1. Sync upstream CE Pi-target skills into `skills/`
+1. Sync upstream CE Pi-target skills and agents into `skills/` and `agents/`
 2. Keep Pi-owned runtime files current:
    - `extensions/workflow-commands.ts`
    - `extensions/review-runtime.ts`
    - `extensions/workflow-context.ts`
    - `src/workflow-context.ts`
+   - `scripts/generate-agent-wrappers.mjs`
 3. Regenerate global wrappers:
    - `node scripts/generate-agent-wrappers.mjs`
 4. Smoke test interactively in Pi:

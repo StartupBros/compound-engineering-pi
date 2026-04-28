@@ -39,6 +39,7 @@
     "plugins",
     "extensions",
     "skills",
+    "agents",
     "prompts",
     "pi-resources",
     "compound-engineering-pi",

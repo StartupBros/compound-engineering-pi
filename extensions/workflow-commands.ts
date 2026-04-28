@@ -37,7 +37,17 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-ideate" },
   },
   {
+    command: "ce-ideate",
+    description: "Compound Engineering ideation workflow",
+    source: { kind: "skill", skillName: "ce-ideate" },
+  },
+  {
     command: "ce:brainstorm",
+    description: "Compound Engineering brainstorm workflow",
+    source: { kind: "skill", skillName: "ce-brainstorm" },
+  },
+  {
+    command: "ce-brainstorm",
     description: "Compound Engineering brainstorm workflow",
     source: { kind: "skill", skillName: "ce-brainstorm" },
   },
@@ -47,7 +57,17 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-plan" },
   },
   {
+    command: "ce-plan",
+    description: "Compound Engineering planning workflow",
+    source: { kind: "skill", skillName: "ce-plan" },
+  },
+  {
     command: "ce:work",
+    description: "Compound Engineering execution workflow",
+    source: { kind: "skill", skillName: "ce-work" },
+  },
+  {
+    command: "ce-work",
     description: "Compound Engineering execution workflow",
     source: { kind: "skill", skillName: "ce-work" },
   },
@@ -57,7 +77,17 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-compound" },
   },
   {
+    command: "ce-compound",
+    description: "Compound Engineering compound knowledge workflow",
+    source: { kind: "skill", skillName: "ce-compound" },
+  },
+  {
     command: "ce:compound-refresh",
+    description: "Refresh or prune stale compound learnings",
+    source: { kind: "skill", skillName: "ce-compound-refresh" },
+  },
+  {
+    command: "ce-compound-refresh",
     description: "Refresh or prune stale compound learnings",
     source: { kind: "skill", skillName: "ce-compound-refresh" },
   },
@@ -69,12 +99,23 @@ const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "test-browser",
     description: "Run browser tests for changed pages",
-    source: { kind: "skill", skillName: "test-browser" },
+    source: { kind: "skill", skillName: "ce-test-browser" },
+  },
+  {
+    command: "ce-test-browser",
+    description: "Run browser tests for changed pages",
+    source: { kind: "skill", skillName: "ce-test-browser" },
   },
   {
     command: "feature-video",
     description: "Record a feature walkthrough video",
-    source: { kind: "skill", skillName: "feature-video" },
+    source: { kind: "skill", skillName: "ce-demo-reel" },
+    deprecatedMessage: "/feature-video is deprecated; running /ce-demo-reel",
+  },
+  {
+    command: "ce-demo-reel",
+    description: "Record a visual PR demo reel",
+    source: { kind: "skill", skillName: "ce-demo-reel" },
   },
   {
     command: "todo-resolve",
@@ -95,7 +136,12 @@ const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "resolve-pr-feedback",
     description: "Resolve PR feedback in parallel",
-    source: { kind: "skill", skillName: "resolve-pr-feedback" },
+    source: { kind: "skill", skillName: "ce-resolve-pr-feedback" },
+  },
+  {
+    command: "ce-resolve-pr-feedback",
+    description: "Resolve PR feedback in parallel",
+    source: { kind: "skill", skillName: "ce-resolve-pr-feedback" },
   },
   {
     command: "reproduce-bug",
@@ -105,7 +151,12 @@ const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "report-bug-ce",
     description: "Report a bug in compound engineering",
-    source: { kind: "skill", skillName: "report-bug-ce" },
+    source: { kind: "skill", skillName: "ce-report-bug" },
+  },
+  {
+    command: "ce-report-bug",
+    description: "Report a bug in compound engineering",
+    source: { kind: "skill", skillName: "ce-report-bug" },
   },
   {
     command: "onboarding",
@@ -114,23 +165,43 @@ const COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ce:changelog",
-    description: "Create a changelog for recent merges",
-    source: { kind: "skill", skillName: "changelog" },
+    description: "Create release notes for recent changes",
+    source: { kind: "skill", skillName: "ce-release-notes" },
+  },
+  {
+    command: "ce-release-notes",
+    description: "Create release notes for recent changes",
+    source: { kind: "skill", skillName: "ce-release-notes" },
   },
   {
     command: "git-commit",
     description: "Create a git commit with a value-focused message",
-    source: { kind: "skill", skillName: "git-commit" },
+    source: { kind: "skill", skillName: "ce-commit" },
+  },
+  {
+    command: "ce-commit",
+    description: "Create a git commit with a value-focused message",
+    source: { kind: "skill", skillName: "ce-commit" },
   },
   {
     command: "git-commit-push-pr",
     description: "Commit, push, and open or update a PR",
-    source: { kind: "skill", skillName: "git-commit-push-pr" },
+    source: { kind: "skill", skillName: "ce-commit-push-pr" },
+  },
+  {
+    command: "ce-commit-push-pr",
+    description: "Commit, push, and open or update a PR",
+    source: { kind: "skill", skillName: "ce-commit-push-pr" },
   },
   {
     command: "test-xcode",
     description: "Build and test an iOS app on simulator",
-    source: { kind: "skill", skillName: "test-xcode" },
+    source: { kind: "skill", skillName: "ce-test-xcode" },
+  },
+  {
+    command: "ce-test-xcode",
+    description: "Build and test an iOS app on simulator",
+    source: { kind: "skill", skillName: "ce-test-xcode" },
   },
   {
     command: "lfg",
