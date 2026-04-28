@@ -37,7 +37,7 @@ npm run release:publish
 npm view compound-engineering-pi version
 ```
 
-You should see: `0.2.5`
+You should see: `0.2.6`
 
 ## 5) Verify Pi install path
 

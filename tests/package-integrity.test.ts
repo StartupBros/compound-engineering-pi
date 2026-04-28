@@ -60,4 +60,17 @@ describe("package integrity", () => {
       expect(workflowCommands).toContain(`command: "${command}"`)
     }
   })
+
+  test("does not ship stale bundled MCPorter config when upstream has no MCP servers", async () => {
+    expect(await pathExists(path.join(repoRoot, "plugins", "compound-engineering", ".mcp.json"))).toBe(false)
+    expect(await pathExists(path.join(repoRoot, "pi-resources", "compound-engineering", "mcporter.json"))).toBe(false)
+  })
+
+  test("compat subagent tool exposes full-output reporting controls", async () => {
+    const compatExtension = await readRepoFile("extensions", "compound-engineering-compat.ts")
+
+    expect(compatExtension).toContain("includeOutputs")
+    expect(compatExtension).toContain("formatSingleSubagentResult")
+    expect(compatExtension).toContain("formatChainSubagentResult")
+  })
 })

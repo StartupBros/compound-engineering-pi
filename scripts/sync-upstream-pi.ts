@@ -50,11 +50,13 @@ try {
     console.log("No generated Pi agents found; preserving existing agents directory if present.")
   }
 
+  const targetMcporterPath = path.join(repoRoot, "pi-resources", "compound-engineering", "mcporter.json")
   if (await pathExists(generatedMcporterPath)) {
     console.log(`Syncing bundled MCPorter config from ${generatedMcporterPath}`)
-    await copyFileToPath(generatedMcporterPath, path.join(repoRoot, "pi-resources", "compound-engineering", "mcporter.json"))
+    await copyFileToPath(generatedMcporterPath, targetMcporterPath)
   } else {
-    console.log("No generated MCPorter config found; preserving existing bundled config.")
+    console.log("No generated MCPorter config found; removing stale bundled config if present.")
+    await rm(targetMcporterPath, { force: true })
   }
 
   console.log("Done. Note: prompts/, extensions/, and Pi-owned compatibility skills are preserved.")

@@ -27,7 +27,7 @@ Keep Pi-specific work here:
   - `skills/` generated from upstream, plus explicitly preserved Pi-owned compatibility skills
   - `agents/`
   - `prompts/` as the single published prompt-template source
-  - `pi-resources/compound-engineering/mcporter.json`
+  - optional `pi-resources/compound-engineering/mcporter.json` only when upstream emits MCP servers
   - vendored `plugins/compound-engineering/` snapshot
 - release/refresh tooling such as `scripts/sync-upstream-pi.ts`
 
@@ -69,7 +69,7 @@ What sync does:
 2. refreshes the vendored `plugins/compound-engineering/` snapshot
 3. regenerates bundled Pi `skills/`
 4. regenerates bundled Pi `agents/`
-5. refreshes bundled `pi-resources/compound-engineering/mcporter.json` when upstream emits one
+5. refreshes bundled `pi-resources/compound-engineering/mcporter.json` when upstream emits one, or removes the stale bundled config when upstream emits none
 6. preserves package-owned Pi runtime extensions, `prompts/`, and local compatibility skills (`onboarding`, `reproduce-bug`, `slfg`, `todo-resolve`, `todo-triage`)
 
 After syncing, regenerate local dogfood wrappers:
