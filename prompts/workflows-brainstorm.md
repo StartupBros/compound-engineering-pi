@@ -76,7 +76,24 @@ Write a brainstorm document to `docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.m
 
 **Document structure:** See the `brainstorming` skill for the template format. Key sections: What We're Building, Why This Approach, Key Decisions, Open Questions.
 
+**Pi-native provenance requirements:** The brainstorm document must start with YAML frontmatter that includes at least:
+
+```yaml
+---
+topic: <kebab-case-topic>
+feature_id: <stable-feature-id>
+document_type: brainstorm
+date: YYYY-MM-DD
+---
+```
+
+- `feature_id` must be a stable kebab-case identifier reused by future plans, PRs, and review todos for this feature.
+- In most cases, `feature_id` should match the brainstorm topic slug unless there is already an established feature identifier.
+- Do not invent a new `feature_id` for later phases of the same feature.
+
 Ensure `docs/brainstorms/` directory exists before writing.
+
+**IMPORTANT:** Before proceeding to Phase 4, check if there are any Open Questions listed in the brainstorm document. If there are open questions, you MUST ask the user about each one using **ask_user_question** before offering to proceed to planning. Move resolved questions to a `Resolved Questions` section.
 
 ### Phase 4: Handoff
 
@@ -86,8 +103,18 @@ Use **ask_user_question tool** to present next steps:
 
 **Options:**
 1. **Review and refine** - Improve the document through structured self-review
-2. **Proceed to planning** - Invoke `/workflows-plan` as a Pi prompt (will auto-detect this brainstorm)
-3. **Done for now** - Return later
+2. **Proceed to planning** - Invoke `/workflows-plan` as a Pi prompt. Pi will hand planning off in a fresh session context when this brainstorm has already been written to disk.
+3. **Share to Proof** - Upload to Proof for collaborative review and sharing
+4. **Ask more questions** - Continue clarifying before moving on
+5. **Done for now** - Return later
+
+**If user selects "Share to Proof":**
+
+Upload the brainstorm markdown to Proof and display the returned URL prominently. If the upload fails, skip silently and return to the Phase 4 options.
+
+**If user selects "Ask more questions":**
+
+Return to Phase 1.2 and continue asking the user questions **one at a time** about edge cases, constraints, preferences, or areas not yet explored. Continue until the user is satisfied, then return to Phase 4.
 
 **If user selects "Review and refine":**
 

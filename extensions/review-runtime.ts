@@ -40,6 +40,7 @@ import {
 } from "@mariozechner/pi-tui";
 import path from "node:path";
 import { promises as fs } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { buildCeWorkflowContextSummary, parseMarkdownFrontmatter } from "../src/workflow-context.ts";
 
 // State to track fresh session review (where we branched from).
@@ -839,7 +840,8 @@ const PULL_REQUEST_PROMPT_FALLBACK =
 const FOLDER_REVIEW_PROMPT =
 	"Review the code in the following paths: {paths}. This is a snapshot review (not a diff). Read the files directly in these paths and provide prioritized, actionable findings.";
 
-const COMPOUND_ENGINEERING_REVIEW_PROMPT_PATH = "/home/will/SITES/pi-compound-engineering/workflow-prompts/workflows-review.md";
+const extensionDir = path.dirname(fileURLToPath(import.meta.url));
+const COMPOUND_ENGINEERING_REVIEW_PROMPT_PATH = path.join(extensionDir, "..", "prompts", "workflows-review.md");
 
 // The detailed review rubric (adapted from Codex's review_prompt.md)
 const REVIEW_RUBRIC = `# Review Guidelines
@@ -2612,6 +2614,20 @@ export default function reviewExtension(pi: ExtensionAPI) {
 
 	pi.registerCommand("ce:review", {
 		description: "Compound Engineering review with PR-first target resolution",
+		handler: async (args, ctx) => {
+			await runCeReviewCommand(args, ctx);
+		},
+	});
+
+	pi.registerCommand("ce-review", {
+		description: "Alias for /ce:review",
+		handler: async (args, ctx) => {
+			await runCeReviewCommand(args, ctx);
+		},
+	});
+
+	pi.registerCommand("ce-code-review", {
+		description: "Alias for /ce:review using the latest upstream CE naming",
 		handler: async (args, ctx) => {
 			await runCeReviewCommand(args, ctx);
 		},

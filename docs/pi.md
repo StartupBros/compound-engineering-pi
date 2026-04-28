@@ -22,18 +22,25 @@ npm i -g mcporter
 
 ### Converter path (advanced/custom)
 
+Prefer the upstream converter package:
+
 ```bash
-bunx compound-engineering-pi install compound-engineering --to pi
+bunx @every-env/compound-plugin install compound-engineering --to pi
 ```
+
+The local `compound-engineering-pi` CLI remains available for compatibility, but upstream is the canonical place for converter behavior.
 
 You will get generated resources under your Pi directory:
 
-- `prompts/` (converted slash commands)
-- `skills/` (plugin skills + generated reviewer skills)
-- `extensions/compound-engineering-compat.ts` (compat tools)
-- `compound-engineering/mcporter.json` (MCPorter server config)
+- `prompts/` (converted slash commands, when present)
+- `skills/` (plugin skills)
+- `agents/` (generated Pi subagent definitions)
+- `extensions/compound-engineering-compat.ts` (compat tools, in this package)
+- `compound-engineering/mcporter.json` (MCPorter server config, when upstream defines MCP servers)
 
-The published package already includes prebuilt `extensions/`, `skills/`, and `prompts/` for Pi package installs.
+The published package already includes prebuilt `extensions/`, `skills/`, `agents/`, and compatibility `prompts/` for Pi package installs.
+
+This repo now tracks the newer upstream Compound Engineering skill set while keeping the older `/workflows-*` prompts as Pi-friendly compatibility aliases.
 
 For package installs, `mcporter_list`/`mcporter_call` also fall back to a bundled config at `pi-resources/compound-engineering/mcporter.json` if no project/global config exists yet.
 
@@ -55,7 +62,7 @@ The `pi` target translates Claude plugin concepts into native Pi resources so te
 |---|---|
 | `commands/*.md` | `.pi/prompts/*.md` |
 | `skills/*/SKILL.md` | `.pi/skills/*/SKILL.md` |
-| `agents/*.md` | generated Pi skills in `.pi/skills/*/SKILL.md` |
+| `agents/*.md` | generated Pi subagent files in `.pi/agents/*.md` / this repo's `agents/*.md` |
 | `Task agent(args)` | `subagent` tool call (generated compat extension) |
 | `AskUserQuestion` | `ask_user_question` tool |
 | MCP server config | MCPorter config in `.pi/compound-engineering/mcporter.json` |
@@ -77,6 +84,12 @@ Supports:
 - **single**: `{ agent, task }`
 - **parallel**: `{ tasks: [...] }`
 - **chain**: `{ chain: [...] }` with `{previous}` placeholder support
+
+Behavior notes:
+- **single mode returns the full subagent output** in the final tool result
+- **chain mode returns the final step output** plus a step summary
+- **parallel mode returns a compact summary by default**; pass `includeOutputs: true` to include full output for each completed subagent
+- if you install a richer `pi-subagents` package, this compatibility extension will automatically step aside and let that tool handle subagents instead
 
 ### `mcporter_list`
 Lists tools for an MCP server via MCPorter.
@@ -111,6 +124,16 @@ This syncs:
 
 ---
 
+## Keeping this package synced with upstream
+
+```bash
+bun run sync:upstream
+```
+
+By default this pulls from `~/.cache/checkouts/github.com/EveryInc/compound-engineering-plugin` when available, falls back to `../compound-engineering-plugin`, refreshes the vendored `plugins/compound-engineering` snapshot, and regenerates bundled Pi skills/agents/MCPorter config.
+
+Maintainer rule: changes to conversion behavior, plugin content, or target semantics should be made upstream first. This repo is the Pi distribution layer.
+
 ## Recommended OSS adoption flow
 
 1. Start with side-by-side generation:
@@ -142,12 +165,19 @@ Run:
 
 ### Subagent calls fail
 Check:
-- target skill exists in `.pi/skills/<name>/SKILL.md`
+- target agent exists in `.pi/agents/<name>.md` or `~/.pi/agent/agents/<name>.md`
+- target skill exists in `.pi/skills/<name>/SKILL.md` when using a skill wrapper
 - nested Pi call works: `pi --no-session -p "/skill:<name> ..."`
 - permissions/sandbox rules in your environment
+
+### I want to see more subagent output
+- single subagents now return their full output in the tool result
+- chain runs return the final step output plus a step summary
+- parallel runs can return all outputs with `includeOutputs: true`
+- if you prefer a richer live subagent UI, install `pi-subagents`; `compound-engineering-pi` will automatically defer to it when present
 
 ---
 
 ## One-paragraph explanation for others
 
-> We added a `--to pi` converter target that ports Compound Engineering Claude plugins into native Pi resources (prompts, skills, extension tools). Claude-only behaviors like `Task(...)` and `AskUserQuestion` are mapped to Pi compatibility tools (`subagent`, `ask_user_question`), and MCP integrations are handled through MCPorter config instead of native MCP runtime assumptions. This keeps the same compounding workflow in Pi while making it easy for open-source teams to share a reproducible setup.
+> We added a `--to pi` converter target that ports Compound Engineering Claude plugins into native Pi resources (skills, subagent definitions, prompts, extension tools). Claude-only behaviors like `Task(...)` and `AskUserQuestion` are mapped to Pi compatibility tools (`subagent`, `ask_user_question`), and MCP integrations are handled through MCPorter config instead of native MCP runtime assumptions. This keeps the same compounding workflow in Pi while making it easy for open-source teams to share a reproducible setup.

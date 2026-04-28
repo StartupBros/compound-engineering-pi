@@ -23,9 +23,12 @@ This command takes a work document (plan, specification, or todo file) and execu
 
    - Read the work document completely
    - Review any references or links provided in the plan
+   - Treat the referenced plan as the canonical implementation scope for this work
+   - Only go back to the brainstorm if you need additional product intent, rejected alternatives, or explicit non-goals that the plan does not capture clearly
    - If anything is unclear or ambiguous, ask clarifying questions now
-   - Get user approval to proceed
-   - **Do not skip this** - better to ask questions now than build the wrong thing
+   - If the user explicitly invoked `/workflows-work <plan-or-todo-path>`, treat that as approval to begin implementation. Do **not** ask for generic permission to start.
+   - Only pause for user input when there is a real unresolved decision (for example: branch/worktree choice on the default branch, an explicit open scope question still left in the plan, or a risky ambiguity the plan did not resolve).
+   - **Do not skip this** - better to ask the one necessary question now than build the wrong thing
 
 2. **Setup Environment**
 
@@ -91,11 +94,26 @@ This command takes a work document (plan, specification, or todo file) and execu
      - Look for similar patterns in codebase
      - Implement following existing conventions
      - Write tests for new functionality
+     - Run System-Wide Test Check (see below)
      - Run tests after changes
      - Mark task as completed in file-based todos (todos/ + /skill:file-todos)
      - Mark off the corresponding checkbox in the plan file ([ ] → [x])
      - Evaluate for incremental commit (see below)
    ```
+
+   **System-Wide Test Check** — Before marking a task done, pause and ask:
+
+   | Question | What to do |
+   |----------|------------|
+   | **What fires when this runs?** Callbacks, middleware, observers, event handlers — trace two levels out from your change. | Read the actual code (not docs) for callbacks on models you touch, middleware in the request chain, `after_*` hooks. |
+   | **Do my tests exercise the real chain?** If every dependency is mocked, the test proves your logic works *in isolation* — it says nothing about the interaction. | Write at least one integration test that uses real objects through the full callback/middleware chain. No mocks for the layers that interact. |
+   | **Can failure leave orphaned state?** If your code persists state before calling an external service, what happens when the service fails? Does retry create duplicates? | Trace the failure path with real objects. If state is created before the risky call, test that failure cleans up or that retry is idempotent. |
+   | **What other interfaces expose this?** Mixins, DSLs, alternative entry points. | Grep for the method/behavior in related classes. If parity is needed, add it now — not as a follow-up. |
+   | **Do error strategies align across layers?** Retry middleware + application fallback + framework error handling — do they conflict or create double execution? | List the specific error classes at each layer. Verify your rescue list matches what the lower layer actually raises. |
+
+   **When to skip:** Leaf-node changes with no callbacks, no state persistence, and no parallel interfaces. If the change is purely additive (new helper method, new view partial), the check takes 10 seconds and the answer is "nothing fires, skip."
+
+   **When this matters most:** Any change that touches callbacks, error handling with fallback/retry, or functionality exposed through multiple interfaces.
 
    **IMPORTANT**: Always update the original plan document by checking off completed items. Use the Edit tool to change `- [ ]` to `- [x]` for each task you finish. This keeps the plan as a living document showing progress and ensures no checkboxes are left unchecked.
 
@@ -142,6 +160,7 @@ This command takes a work document (plan, specification, or todo file) and execu
    - Don't wait until the end to test
    - Fix failures immediately
    - Add new tests for new functionality
+   - **Unit tests with mocks prove logic in isolation. Integration tests with real objects prove the layers work together.** If your change touches callbacks, middleware, or error handling, you need both.
 
 5. **Figma Design Sync** (if applicable)
 
@@ -174,7 +193,7 @@ This command takes a work document (plan, specification, or todo file) and execu
 
 2. **Consider Reviewer Agents** (Optional)
 
-   Use for complex, risky, or large changes:
+   Use for complex, risky, or large changes. If `compound-engineering.local.md` exists and includes `review_agents`, prefer that configured reviewer set. Otherwise fall back to these common reviewers:
 
    - **code-simplicity-reviewer**: Check for unnecessary complexity
    - **kieran-rails-reviewer**: Verify Rails conventions (Rails projects)
@@ -182,14 +201,7 @@ This command takes a work document (plan, specification, or todo file) and execu
    - **security-sentinel**: Scan for security vulnerabilities
    - **cora-test-reviewer**: Review test quality (Rails projects with comprehensive test coverage)
 
-   Run reviewers in parallel with Task tool:
-
-   ```
-   Task(code-simplicity-reviewer): "Review changes for simplicity"
-   Task(kieran-rails-reviewer): "Check Rails conventions"
-   ```
-
-   Present findings to user and address critical issues.
+   Run reviewers in parallel with the **subagent** tool when appropriate, present findings to the user, and address critical issues before shipping.
 
 3. **Final Validation**
    - All file-based todos (todos/ + /skill:file-todos) tasks marked completed
@@ -198,6 +210,16 @@ This command takes a work document (plan, specification, or todo file) and execu
    - Code follows existing patterns
    - Figma designs match (if applicable)
    - No console errors or warnings
+
+4. **Prepare Operational Validation Plan** (REQUIRED)
+   - Add a `## Post-Deploy Monitoring & Validation` section to the PR description for every change.
+   - Include concrete:
+     - Log queries/search terms
+     - Metrics or dashboards to watch
+     - Expected healthy signals
+     - Failure signals and rollback/mitigation trigger
+     - Validation window and owner
+   - If there is truly no production/runtime impact, still include the section with: `No additional operational monitoring required` and a one-line reason.
 
 ### Phase 4: Ship It
 
@@ -264,9 +286,33 @@ This command takes a work document (plan, specification, or todo file) and execu
    - Why it was needed
    - Key decisions made
 
+   ## Compound Engineering Context
+   - Feature ID: <carry forward from plan frontmatter>
+   - Plan: docs/plans/<exact-plan-file>.md
+   - Brainstorm: docs/brainstorms/<exact-brainstorm-file>.md # omit only if none exists
+   - Plan Kind: <single|master|phase>
+   - Phase: <phase-id if applicable>
+   - Parent Plan: docs/plans/<master-plan>.md # include for phase plans
+
    ## Testing
    - Tests added/modified
    - Manual testing performed
+
+   ## Post-Deploy Monitoring & Validation
+   - **What to monitor/search**
+     - Logs:
+     - Metrics/Dashboards:
+   - **Validation checks (queries/commands)**
+     - `command or query here`
+   - **Expected healthy behavior**
+     - Expected signal(s)
+   - **Failure signal(s) / rollback trigger**
+     - Trigger + immediate action
+   - **Validation window & owner**
+     - Window:
+     - Owner:
+   - **If no operational impact**
+     - `No additional operational monitoring required: <reason>`
 
    ## Before / After Screenshots
    | Before | After |
@@ -283,7 +329,14 @@ This command takes a work document (plan, specification, or todo file) and execu
    )"
    ```
 
-4. **Notify User**
+4. **Update Plan Status**
+
+   If the input document has YAML frontmatter with a `status` field, update it to `completed`:
+   ```
+   status: active  →  status: completed
+   ```
+
+5. **Notify User**
    - Summarize what was completed
    - Link to PR
    - Note any follow-up work needed
@@ -406,6 +459,7 @@ Before creating PR, verify:
 - [ ] Figma designs match implementation (if applicable)
 - [ ] Before/after screenshots captured and uploaded (for UI changes)
 - [ ] Commit messages follow conventional format
+- [ ] PR description includes Post-Deploy Monitoring & Validation section (or explicit no-impact rationale)
 - [ ] PR description includes summary, testing notes, and screenshots
 - [ ] PR description includes Compound Engineered badge
 
