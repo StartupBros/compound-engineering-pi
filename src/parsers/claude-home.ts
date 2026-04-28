@@ -2,6 +2,7 @@ import path from "path"
 import os from "os"
 import fs from "fs/promises"
 import type { ClaudeSkill, ClaudeMcpServer } from "../types/claude"
+import { parseFrontmatter } from "../utils/frontmatter"
 
 export interface ClaudeHomeConfig {
   skills: ClaudeSkill[]
@@ -37,8 +38,15 @@ async function loadPersonalSkills(skillsDir: string): Promise<ClaudeSkill[]> {
         const sourceDir = entry.isSymbolicLink()
           ? await fs.realpath(entryPath)
           : entryPath
+        const raw = await fs.readFile(skillPath, "utf-8")
+        const { data, body } = parseFrontmatter(raw)
         skills.push({
-          name: entry.name,
+          name: (data.name as string) ?? entry.name,
+          description: data.description as string | undefined,
+          argumentHint: data["argument-hint"] as string | undefined,
+          disableModelInvocation: data["disable-model-invocation"] === true ? true : undefined,
+          body: body.trim(),
+          frontmatter: data,
           sourceDir,
           skillPath,
         })

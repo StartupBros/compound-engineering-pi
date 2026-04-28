@@ -84,7 +84,7 @@ export default defineCommand({
       const codexHome = resolveCodexRoot(args.codexHome)
       const piHome = resolvePiRoot(args.piHome)
 
-      const agentMode = String(args.agentMode) === "primary" ? "primary" : "subagent"
+      const agentMode: "primary" | "subagent" = String(args.agentMode) === "primary" ? "primary" : "subagent"
       const options = {
         agentMode,
         inferTemperature: Boolean(args.inferTemperature),

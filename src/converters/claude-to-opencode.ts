@@ -11,6 +11,7 @@ import type {
   OpenCodeCommandConfig,
   OpenCodeConfig,
   OpenCodeMcpServer,
+  OpenCodePermission,
 } from "../types/opencode"
 
 export type PermissionMode = "none" | "broad" | "from-commands"
@@ -313,7 +314,7 @@ function applyPermissions(
     }
   }
 
-  const permission: Record<string, "allow" | "deny"> = {}
+  const permission: NonNullable<OpenCodeConfig["permission"]> = {}
   const tools: Record<string, boolean> = {}
 
   for (const tool of sourceTools) {
@@ -328,11 +329,11 @@ function applyPermissions(
     for (const tool of sourceTools) {
       const toolPatterns = patterns[tool]
       if (toolPatterns && toolPatterns.size > 0) {
-        const patternPermission: Record<string, "allow" | "deny"> = { "*": "deny" }
+        const patternPermission: Record<string, OpenCodePermission> = { "*": "deny" }
         for (const pattern of toolPatterns) {
           patternPermission[pattern] = "allow"
         }
-        ;(permission as Record<string, typeof patternPermission>)[tool] = patternPermission
+        permission[tool] = patternPermission
       } else {
         permission[tool] = enabled.has(tool) ? "allow" : "deny"
       }
@@ -342,11 +343,11 @@ function applyPermissions(
   if (mode !== "broad") {
     for (const [tool, toolPatterns] of Object.entries(patterns)) {
       if (!toolPatterns || toolPatterns.size === 0) continue
-      const patternPermission: Record<string, "allow" | "deny"> = { "*": "deny" }
+      const patternPermission: Record<string, OpenCodePermission> = { "*": "deny" }
       for (const pattern of toolPatterns) {
         patternPermission[pattern] = "allow"
       }
-      ;(permission as Record<string, typeof patternPermission>)[tool] = patternPermission
+      permission[tool] = patternPermission
     }
   }
 
@@ -358,12 +359,12 @@ function applyPermissions(
     const combined = new Set<string>()
     for (const pattern of patterns.write ?? []) combined.add(pattern)
     for (const pattern of patterns.edit ?? []) combined.add(pattern)
-    const combinedPermission: Record<string, "allow" | "deny"> = { "*": "deny" }
+    const combinedPermission: Record<string, OpenCodePermission> = { "*": "deny" }
     for (const pattern of combined) {
       combinedPermission[pattern] = "allow"
     }
-    ;(permission as Record<string, typeof combinedPermission>).edit = combinedPermission
-    ;(permission as Record<string, typeof combinedPermission>).write = combinedPermission
+    permission.edit = combinedPermission
+    permission.write = combinedPermission
   }
 
   config.permission = permission
