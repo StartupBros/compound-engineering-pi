@@ -39,14 +39,13 @@ async function loadPersonalSkills(skillsDir: string): Promise<ClaudeSkill[]> {
           ? await fs.realpath(entryPath)
           : entryPath
         const raw = await fs.readFile(skillPath, "utf-8")
-        const { data, body } = parseFrontmatter(raw)
+        const { data } = parseFrontmatter(raw)
         skills.push({
           name: (data.name as string) ?? entry.name,
           description: data.description as string | undefined,
           argumentHint: data["argument-hint"] as string | undefined,
           disableModelInvocation: data["disable-model-invocation"] === true ? true : undefined,
-          body: body.trim(),
-          frontmatter: data,
+          ce_platforms: Array.isArray(data.ce_platforms) ? data.ce_platforms as string[] : undefined,
           sourceDir,
           skillPath,
         })

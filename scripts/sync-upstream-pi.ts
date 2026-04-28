@@ -21,12 +21,12 @@ try {
     "run",
     "src/index.ts",
     "install",
-    "./plugins/compound-engineering",
+    sourcePluginDir,
     "--to",
     "pi",
     "--pi-home",
     generatedRoot,
-  ], sourceRoot)
+  ], repoRoot)
 
   const generatedPiRoot = path.join(generatedRoot, ".pi")
   const generatedSkillsDir = path.join(generatedPiRoot, "skills")
