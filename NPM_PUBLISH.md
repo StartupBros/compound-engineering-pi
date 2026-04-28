@@ -5,7 +5,7 @@ If this is your first time publishing, run these exact commands in order.
 ## 0) Go to repo
 
 ```bash
-cd /tmp/compound-engineering-pi
+cd /home/will/SITES/pi-compound-engineering
 ```
 
 ## 1) Login once
