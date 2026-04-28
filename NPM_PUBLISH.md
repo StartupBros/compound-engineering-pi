@@ -37,7 +37,7 @@ npm run release:publish
 npm view compound-engineering-pi version
 ```
 
-You should see: `0.2.3`
+You should see: `0.2.5`
 
 ## 5) Verify Pi install path
 
@@ -61,7 +61,7 @@ Your npm account is not allowed to publish this package name.
 Use your own scoped package name in `package.json`, e.g.:
 
 ```json
-"name": "@gvkhosla/compound-engineering-pi"
+"name": "@your-scope/compound-engineering-pi"
 ```
 
 Then publish with:

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import { loadCeWorkflowContext, parseMarkdownFrontmatter, type CeWorkflowContext } from "./workflow-context";
+import { loadCeWorkflowContext, parseMarkdownFrontmatter, type CeWorkflowContext } from "./workflow-context.ts";
 
 export type CeTodoStatus = "pending" | "ready" | "complete" | "wont_fix";
 export type CeTodoPriority = "p1" | "p2" | "p3";

@@ -46,6 +46,13 @@ describe("package integrity", () => {
     }
   })
 
+  test("Pi runtime support modules use extension-resolvable relative imports", async () => {
+    const ceTodos = await readRepoFile("src", "ce-todos.ts")
+
+    expect(ceTodos).toContain('from "./workflow-context.ts"')
+    expect(ceTodos).not.toMatch(/from ["']\.\/workflow-context["']/)
+  })
+
   test("legacy workflows colon aliases remain extension-backed", async () => {
     const workflowCommands = await readRepoFile("extensions", "workflow-commands.ts")
 

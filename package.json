@@ -1,6 +1,6 @@
 {
   "name": "compound-engineering-pi",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "type": "module",
   "private": false,
   "description": "Pi-first Compound Engineering extension with subagents and MCPorter compatibility.",
@@ -19,13 +19,13 @@
   },
   "license": "MIT",
   "author": "Geet Khosla",
-  "homepage": "https://github.com/gvkhosla/compound-engineering-pi",
+  "homepage": "https://github.com/StartupBros/compound-engineering-pi",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gvkhosla/compound-engineering-pi.git"
+    "url": "git+https://github.com/StartupBros/compound-engineering-pi.git"
   },
   "bugs": {
-    "url": "https://github.com/gvkhosla/compound-engineering-pi/issues"
+    "url": "https://github.com/StartupBros/compound-engineering-pi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -75,7 +75,7 @@
     "prompts": [
       "./prompts"
     ],
-    "image": "https://opengraph.githubassets.com/1/gvkhosla/compound-engineering-pi"
+    "image": "https://opengraph.githubassets.com/1/StartupBros/compound-engineering-pi"
   },
   "dependencies": {
     "citty": "^0.1.6",

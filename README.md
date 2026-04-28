@@ -1,7 +1,7 @@
 # Compound Engineering for Pi
 
 [![npm](https://img.shields.io/npm/v/compound-engineering-pi)](https://www.npmjs.com/package/compound-engineering-pi)
-[![Build Status](https://github.com/gvkhosla/compound-engineering-pi/actions/workflows/ci.yml/badge.svg)](https://github.com/gvkhosla/compound-engineering-pi/actions/workflows/ci.yml)
+[![Build Status](https://github.com/StartupBros/compound-engineering-pi/actions/workflows/ci.yml/badge.svg)](https://github.com/StartupBros/compound-engineering-pi/actions/workflows/ci.yml)
 
 Compound Engineering adapted for [Pi](https://github.com/mariozechner/pi-coding-agent). This package keeps Pi users close to the evolving Compound Engineering workflow while preserving Pi-native runtime behavior where Claude Code assumptions do not map 1:1.
 
@@ -58,7 +58,7 @@ Legacy `workflows:*` aliases remain available for compatibility.
 
 ### Synced specialist skills and agents
 
-This package tracks upstream Compound Engineering 3.2.x content, currently bundling generated Pi skills plus generated Pi subagent definitions for review, research, design, workflow automation, git workflows, and more. A few Pi compatibility skills remain for legacy commands that are still useful locally.
+This package tracks upstream Compound Engineering 3.3.x content, currently bundling generated Pi skills plus generated Pi subagent definitions for review, research, design, workflow automation, git workflows, and more. A few Pi compatibility skills remain for legacy commands that are still useful locally.
 
 ### Pi compatibility layer
 
