@@ -1,5 +1,5 @@
 ---
-description: Resolve all pending CLI todos using parallel processing
+description: Resolve approved ready todos using parallel processing
 argument-hint: "[optional: specific todo ID or pattern]"
 ---
 
@@ -9,17 +9,19 @@ Resolve all TODO comments using parallel processing.
 
 ### 1. Analyze
 
-Get all unresolved TODOs from the /todos/\*.md directory
+Get all `*-ready-*.md` todos from the `/todos/\*.md` directory. These are the items already approved for implementation.
 
-If any todo recommends deleting, removing, or gitignoring files in `docs/plans/` or `docs/solutions/`, skip it and mark it as `wont_fix`. These are compound-engineering pipeline artifacts that are intentional and permanent.
+Do **not** work `pending`, `wont_fix`, or `complete` items. If there are no ready todos, stop and say so.
+
+If any ready todo recommends deleting, removing, or gitignoring files in `docs/plans/` or `docs/solutions/`, skip it and mark it as `wont_fix`. These are compound-engineering pipeline artifacts that are intentional and permanent.
 
 ### 2. Plan
 
-Create a file-based todos (todos/ + /skill:file-todos) list of all unresolved items grouped by type.Make sure to look at dependencies that might occur and prioritize the ones needed by others. For example, if you need to change a name, you must wait to do the others. Output a mermaid flow diagram showing how we can do this. Can we do everything in parallel? Do we need to do one first that leads to others in parallel? I'll put the to-dos in the mermaid diagram flow‑wise so the agent knows how to proceed in order.
+Create a file-based todos (todos/ + /skill:file-todos) list of all ready items grouped by type. Make sure to look at dependencies that might occur and prioritize the ones needed by others. For example, if you need to change a name, you must wait to do the others. Output a mermaid flow diagram showing how we can do this. Can we do everything in parallel? Do we need to do one first that leads to others in parallel? I'll put the to-dos in the mermaid diagram flow‑wise so the agent knows how to proceed in order.
 
 ### 3. Implement (PARALLEL)
 
-Spawn a pr-comment-resolver agent for each unresolved item in parallel.
+Spawn a pr-comment-resolver agent for each ready item in parallel.
 
 So if there are 3 comments, it will spawn 3 pr-comment-resolver agents in parallel. liek this
 
@@ -32,5 +34,5 @@ Always run all in parallel subagents/Tasks for each Todo item.
 ### 4. Commit & Resolve
 
 - Commit changes
-- Remove the TODO from the file, and mark it as resolved.
+- Update each resolved todo file using the file-todos workflow (work log, acceptance criteria, rename to `*-complete-*.md`, `status: complete`)
 - Push to remote

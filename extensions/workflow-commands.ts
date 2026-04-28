@@ -22,7 +22,7 @@ type CommandSpec = {
 }
 
 const extensionDir = path.dirname(fileURLToPath(import.meta.url))
-const workflowPromptsDir = path.join(extensionDir, "..", "workflow-prompts")
+const promptsDir = path.join(extensionDir, "..", "prompts")
 const skillsDir = path.join(extensionDir, "..", "skills")
 
 const WORKFLOW_HANDOFF_ANCHOR_TYPE = "ce-workflow-handoff-anchor"
@@ -52,6 +52,12 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-brainstorm" },
   },
   {
+    command: "workflows:brainstorm",
+    description: "Deprecated alias for /ce:brainstorm",
+    source: { kind: "skill", skillName: "ce-brainstorm" },
+    deprecatedMessage: "/workflows:brainstorm is deprecated; running canonical /ce:brainstorm",
+  },
+  {
     command: "ce:plan",
     description: "Compound Engineering planning workflow",
     source: { kind: "skill", skillName: "ce-plan" },
@@ -60,6 +66,12 @@ const COMMAND_SPECS: CommandSpec[] = [
     command: "ce-plan",
     description: "Compound Engineering planning workflow",
     source: { kind: "skill", skillName: "ce-plan" },
+  },
+  {
+    command: "workflows:plan",
+    description: "Deprecated alias for /ce:plan",
+    source: { kind: "skill", skillName: "ce-plan" },
+    deprecatedMessage: "/workflows:plan is deprecated; running canonical /ce:plan",
   },
   {
     command: "ce:work",
@@ -72,6 +84,12 @@ const COMMAND_SPECS: CommandSpec[] = [
     source: { kind: "skill", skillName: "ce-work" },
   },
   {
+    command: "workflows:work",
+    description: "Deprecated alias for /ce:work",
+    source: { kind: "skill", skillName: "ce-work" },
+    deprecatedMessage: "/workflows:work is deprecated; running canonical /ce:work",
+  },
+  {
     command: "ce:compound",
     description: "Compound Engineering compound knowledge workflow",
     source: { kind: "skill", skillName: "ce-compound" },
@@ -80,6 +98,12 @@ const COMMAND_SPECS: CommandSpec[] = [
     command: "ce-compound",
     description: "Compound Engineering compound knowledge workflow",
     source: { kind: "skill", skillName: "ce-compound" },
+  },
+  {
+    command: "workflows:compound",
+    description: "Deprecated alias for /ce:compound",
+    source: { kind: "skill", skillName: "ce-compound" },
+    deprecatedMessage: "/workflows:compound is deprecated; running canonical /ce:compound",
   },
   {
     command: "ce:compound-refresh",
@@ -229,7 +253,7 @@ function renderPromptTemplate(template: string, args: string | undefined): strin
 }
 
 async function loadPromptBody(promptFile: string): Promise<string> {
-  const promptPath = path.join(workflowPromptsDir, promptFile)
+  const promptPath = path.join(promptsDir, promptFile)
   const content = await fs.readFile(promptPath, "utf8")
   return stripFrontmatter(content)
 }

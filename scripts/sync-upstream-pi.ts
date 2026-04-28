@@ -1,4 +1,4 @@
-import { access, mkdtemp, rm, cp } from "fs/promises"
+import { access, mkdtemp, rm, cp, mkdir } from "fs/promises"
 import os from "os"
 import path from "path"
 
@@ -13,6 +13,7 @@ const sourceRoot = process.env.COMPOUND_PLUGIN_SOURCE
 
 const sourcePluginDir = path.join(sourceRoot, "plugins", "compound-engineering")
 const targetPluginDir = path.join(repoRoot, "plugins", "compound-engineering")
+const piOwnedSkillNames = ["onboarding", "reproduce-bug", "slfg", "todo-resolve", "todo-triage"]
 const generatedRoot = await mkdtemp(path.join(os.tmpdir(), "compound-engineering-pi-sync-"))
 
 try {
@@ -32,11 +33,15 @@ try {
   const generatedAgentsDir = path.join(generatedPiRoot, "agents")
   const generatedMcporterPath = path.join(generatedPiRoot, "compound-engineering", "mcporter.json")
 
+  const preservedPiOwnedSkillsDir = path.join(generatedRoot, "pi-owned-skills")
+  const preservedPiOwnedSkills = await preservePiOwnedSkills(preservedPiOwnedSkillsDir)
+
   console.log(`Syncing vendored plugin snapshot from ${sourcePluginDir}`)
   await replaceDir(targetPluginDir, sourcePluginDir)
 
   console.log(`Syncing generated Pi skills from ${generatedSkillsDir}`)
   await replaceDir(path.join(repoRoot, "skills"), generatedSkillsDir)
+  await restorePiOwnedSkills(preservedPiOwnedSkillsDir, preservedPiOwnedSkills)
 
   if (await pathExists(generatedAgentsDir)) {
     console.log(`Syncing generated Pi agents from ${generatedAgentsDir}`)
@@ -52,7 +57,7 @@ try {
     console.log("No generated MCPorter config found; preserving existing bundled config.")
   }
 
-  console.log("Done. Note: prompts/, extensions/, and Pi-native runtime files are preserved.")
+  console.log("Done. Note: prompts/, extensions/, and Pi-owned compatibility skills are preserved.")
 } finally {
   await rm(generatedRoot, { recursive: true, force: true })
 }
@@ -79,6 +84,29 @@ async function replaceDir(target: string, source: string) {
 async function copyFileToPath(source: string, target: string) {
   await rm(target, { force: true })
   await cp(source, target)
+}
+
+async function preservePiOwnedSkills(preservedRoot: string): Promise<string[]> {
+  const preserved = [] as string[]
+  await mkdir(preservedRoot, { recursive: true })
+  for (const skillName of piOwnedSkillNames) {
+    const source = path.join(repoRoot, "skills", skillName)
+    if (!(await pathExists(source))) continue
+    await cp(source, path.join(preservedRoot, skillName), { recursive: true })
+    preserved.push(skillName)
+  }
+  return preserved
+}
+
+async function restorePiOwnedSkills(preservedRoot: string, skillNames: string[]) {
+  for (const skillName of skillNames) {
+    const target = path.join(repoRoot, "skills", skillName)
+    if (await pathExists(target)) {
+      throw new Error(`Upstream generated a skill named ${skillName}; resolve the conflict before preserving the Pi-owned copy.`)
+    }
+    console.log(`Restoring Pi-owned compatibility skill ${skillName}`)
+    await cp(path.join(preservedRoot, skillName), target, { recursive: true })
+  }
 }
 
 async function pathExists(filePath: string): Promise<boolean> {

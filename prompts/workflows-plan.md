@@ -35,11 +35,19 @@ ls -la docs/brainstorms/*.md 2>/dev/null | head -10
 - If multiple candidates match, use the most recent one
 
 **If a relevant brainstorm exists:**
-1. Read the brainstorm document
-2. Announce: "Found brainstorm from [date]: [topic]. Using as context for planning."
-3. Extract key decisions, chosen approach, and open questions
+1. Read the brainstorm document **thoroughly** — every section matters
+2. Announce: "Found brainstorm from [date]: [topic]. Using as foundation for planning."
+3. Extract and carry forward **ALL** of the following into the plan:
+   - Key decisions and their rationale
+   - Chosen approach and why alternatives were rejected
+   - Constraints and requirements discovered during brainstorming
+   - Open questions (flag these for resolution during planning)
+   - Success criteria and scope boundaries
+   - Any specific technical choices or patterns discussed
 4. **Skip the idea refinement questions below** - the brainstorm already answered WHAT to build
-5. Use brainstorm decisions as input to the research phase
+5. Use brainstorm content as the **primary input** to research and planning phases
+6. **Critical:** Throughout the plan, reference carried-forward decisions with `(see brainstorm: docs/brainstorms/<filename>)` so the original context is not lost
+7. **Do not omit brainstorm content** — if the brainstorm discussed it, the plan must address it, even briefly
 
 **If multiple brainstorms could match:**
 Use **ask_user_question tool** to ask which brainstorm to use, or whether to proceed without one.
@@ -73,8 +81,8 @@ First, I need to understand the project's conventions, existing patterns, and an
 
 Run these agents **in parallel** to gather local context:
 
-- Run subagent with agent="repo-research-analyst" and task="feature_description".
-- Run subagent with agent="learnings-researcher" and task="feature_description".
+- Run subagent with agent="repo-research-analyst" and task="Research existing repository patterns, similar code, and CLAUDE/AGENTS guidance for: <feature_description>".
+- Run subagent with agent="learnings-researcher" and task="Find prior learnings, solution docs, gotchas, and institutional context relevant to: <feature_description>".
 
 **What to look for:**
 - **Repo research:** existing patterns, CLAUDE.md guidance, technology familiarity, pattern consistency
@@ -104,8 +112,8 @@ Examples:
 
 Run these agents in parallel:
 
-- Run subagent with agent="best-practices-researcher" and task="feature_description".
-- Run subagent with agent="framework-docs-researcher" and task="feature_description".
+- Run subagent with agent="best-practices-researcher" and task="Research current best practices and implementation pitfalls for: <feature_description>".
+- Run subagent with agent="framework-docs-researcher" and task="Research official framework/platform documentation relevant to: <feature_description>".
 
 ### 1.6. Consolidate Research
 
@@ -149,7 +157,7 @@ Think like a product manager - what would make this issue clear and actionable? 
 
 After planning the issue structure, run SpecFlow Analyzer to validate and refine the feature specification:
 
-- Run subagent with agent="spec-flow-analyzer" and task="feature_description, research_findings".
+- Run subagent with agent="spec-flow-analyzer" and task="Analyze this feature specification and research findings for gaps, edge cases, and missing acceptance criteria: <feature_description> | <research_findings>".
 
 **SpecFlow Analyzer Output:**
 
@@ -177,7 +185,12 @@ Select how comprehensive you want the issue to be, simpler is mostly better.
 ---
 title: [Issue Title]
 type: [feat|fix|refactor]
+status: active
 date: YYYY-MM-DD
+feature_id: <stable-feature-id>
+topic: <kebab-case-topic>
+plan_kind: single
+origin: docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md  # if originated from brainstorm, otherwise omit
 ---
 
 # [Issue Title]
@@ -205,8 +218,9 @@ class Test
 end
 ```
 
-## References
+## Sources
 
+- **Origin brainstorm:** [docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md](path) — include if plan originated from a brainstorm
 - Related issue: #[issue_number]
 - Documentation: [relevant_docs_url]
 ````
@@ -229,7 +243,12 @@ end
 ---
 title: [Issue Title]
 type: [feat|fix|refactor]
+status: active
 date: YYYY-MM-DD
+feature_id: <stable-feature-id>
+topic: <kebab-case-topic>
+plan_kind: single
+origin: docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md  # if originated from brainstorm, otherwise omit
 ---
 
 # [Issue Title]
@@ -252,6 +271,14 @@ date: YYYY-MM-DD
 - Performance implications
 - Security considerations
 
+## System-Wide Impact
+
+- **Interaction graph**: [What callbacks/middleware/observers fire when this runs?]
+- **Error propagation**: [How do errors flow across layers? Do retry strategies align?]
+- **State lifecycle risks**: [Can partial failure leave orphaned/inconsistent state?]
+- **API surface parity**: [What other interfaces expose similar functionality and need the same change?]
+- **Integration test scenarios**: [Cross-layer scenarios that unit tests won't catch]
+
 ## Acceptance Criteria
 
 - [ ] Detailed requirement 1
@@ -266,8 +293,9 @@ date: YYYY-MM-DD
 
 [What could block or complicate this]
 
-## References & Research
+## Sources & References
 
+- **Origin brainstorm:** [docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md](path) — include if plan originated from a brainstorm
 - Similar implementations: [file_path:line_number]
 - Best practices: [documentation_url]
 - Related PRs: #[pr_number]
@@ -293,7 +321,12 @@ date: YYYY-MM-DD
 ---
 title: [Issue Title]
 type: [feat|fix|refactor]
+status: active
 date: YYYY-MM-DD
+feature_id: <stable-feature-id>
+topic: <kebab-case-topic>
+plan_kind: single
+origin: docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md  # if originated from brainstorm, otherwise omit
 ---
 
 # [Issue Title]
@@ -340,6 +373,28 @@ date: YYYY-MM-DD
 
 [Other solutions evaluated and why rejected]
 
+## System-Wide Impact
+
+### Interaction Graph
+
+[Map the chain reaction: what callbacks, middleware, observers, and event handlers fire when this code runs? Trace at least two levels deep. Document: "Action X triggers Y, which calls Z, which persists W."]
+
+### Error & Failure Propagation
+
+[Trace errors from lowest layer up. List specific error classes and where they're handled. Identify retry conflicts, unhandled error types, and silent failure swallowing.]
+
+### State Lifecycle Risks
+
+[Walk through each step that persists state. Can partial failure orphan rows, duplicate records, or leave caches stale? Document cleanup mechanisms or their absence.]
+
+### API Surface Parity
+
+[List all interfaces (classes, DSLs, endpoints) that expose equivalent functionality. Note which need updating and which share the code path.]
+
+### Integration Test Scenarios
+
+[3-5 cross-layer test scenarios that unit tests with mocks would never catch. Include expected behavior for each.]
+
 ## Acceptance Criteria
 
 ### Functional Requirements
@@ -382,7 +437,11 @@ date: YYYY-MM-DD
 
 [What docs need updating]
 
-## References & Research
+## Sources & References
+
+### Origin
+
+- **Brainstorm document:** [docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md](path) — include if plan originated from a brainstorm. Key decisions carried forward: [list 2-3 major decisions from brainstorm]
 
 ### Internal References
 
@@ -461,6 +520,16 @@ end
 
 ### 6. Final Review & Submission
 
+**Brainstorm cross-check (if plan originated from a brainstorm):**
+
+Before finalizing, re-read the brainstorm document and verify:
+- [ ] Every key decision from the brainstorm is reflected in the plan
+- [ ] The chosen approach matches what was decided in the brainstorm
+- [ ] Constraints and requirements from the brainstorm are captured in acceptance criteria
+- [ ] Open questions from the brainstorm are either resolved or flagged
+- [ ] The `origin:` frontmatter field points to the brainstorm file
+- [ ] The Sources section includes the brainstorm with a summary of carried-forward decisions
+
 **Pre-submission Checklist:**
 
 - [ ] Title is searchable and descriptive
@@ -470,6 +539,46 @@ end
 - [ ] Acceptance criteria are measurable
 - [ ] Add names of files in pseudo code examples and todo lists
 - [ ] Add an ERD mermaid diagram if applicable for new model changes
+
+## Write Plan File
+
+**REQUIRED:** Write the plan file to disk before presenting any options.
+
+```bash
+mkdir -p docs/plans/
+```
+
+**Pi-native provenance requirements:** Every plan file must include machine-readable frontmatter so downstream `/workflows-work`, `/workflows-review`, and `/review-skeptical` can recover exact feature intent without guessing.
+
+Required fields:
+
+```yaml
+---
+title: [Issue Title]
+type: [feat|fix|refactor]
+status: active
+date: YYYY-MM-DD
+feature_id: <stable-feature-id>
+topic: <kebab-case-topic>
+plan_kind: single # single | master | phase
+origin: docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md  # include when planning from a brainstorm
+phase_id: phase-1                                        # include for phase plans only
+parent_plan: docs/plans/YYYY-MM-DD-<feature>-master-plan.md  # include for phase plans only
+---
+```
+
+Rules:
+- Carry `feature_id` forward from the brainstorm whenever one exists.
+- Use `plan_kind: single` for a one-PR implementation plan.
+- Use `plan_kind: master` for a multi-phase umbrella plan.
+- Use `plan_kind: phase` plus `phase_id` and `parent_plan` when this plan represents one PR-sized slice of a larger feature.
+- If the brainstorm established non-goals or rejected alternatives, preserve those decisions in the plan body so downstream skeptical review can honor them.
+
+Use the Write tool to save the complete plan to `docs/plans/YYYY-MM-DD-<type>-<descriptive-name>-plan.md`.
+
+Confirm: `Plan written to docs/plans/<filename>`
+
+**Pipeline mode:** If invoked from an automated workflow or any non-interactive context, skip optional user-question steps and proceed to writing the plan automatically.
 
 ## Output Format
 
@@ -499,25 +608,29 @@ After writing the plan file, use the **ask_user_question tool** to present these
 2. **Use `/deepen-plan`** - Enhance each section with parallel research agents (best practices, performance, UI)
 3. **Use `/technical_review`** - Technical feedback from code-focused reviewers (DHH, Kieran, Simplicity)
 4. **Review and refine** - Improve the document through structured self-review
-5. **Use `/workflows-work`** - Begin implementing this plan locally
-6. **Use `/workflows-work` on remote** - Begin implementing in Claude Code on the web (use `&` to run in background)
-7. **Create Issue** - Create issue in project tracker (GitHub/Linear)
+5. **Share to Proof** - Upload to Proof for collaborative review and sharing
+6. **Use `/workflows-work`** - Begin implementing this plan locally. Pi will hand work off in a fresh session context when this plan already exists on disk.
+7. **Use `/workflows-work` on remote** - Begin implementing in Claude Code on the web (use `&` to run in background)
+8. **Create Issue** - Create issue in project tracker (GitHub/Linear)
 
 Based on selection:
-- **Open plan in editor** → Run `open docs/plans/<plan_filename>.md` to open the file in the user's default editor
-- **`/deepen-plan`** → Run `pi --no-session -p "/deepen-plan docs/plans/<plan_filename>.md"` to enhance with research
-- **`/technical_review`** → Run `pi --no-session -p "/technical_review docs/plans/<plan_filename>.md"`
+- **Open plan in editor** → Open `docs/plans/<plan_filename>.md` for the user if possible.
+- **`/deepen-plan`** → Do **not** spawn a nested `pi` process. Instead, tell the user to run `/deepen-plan docs/plans/<plan_filename>.md` next. Pi's command runtime will handle session-native handoff.
+- **`/technical_review`** → Do **not** spawn a nested `pi` process. Instead, tell the user to run `/technical_review docs/plans/<plan_filename>.md` next.
 - **Review and refine** → Load `document-review` skill.
-- **`/workflows-work`** → Run `pi --no-session -p "/workflows-work docs/plans/<plan_filename>.md"`
-- **`/workflows-work` on remote** → Run `pi --no-session -p "/workflows-work docs/plans/<plan_filename>.md" &` to start work in background
-- **Create Issue** → See "Issue Creation" section below
-- **Other** (automatically provided) → Accept free text for rework or specific changes
+- **Share to Proof** → Upload the plan to Proof, display the returned URL prominently, and if upload fails skip silently then return to the options.
+- **`/workflows-work`** → Do **not** spawn a nested `pi` process. Instead, tell the user to run `/workflows-work docs/plans/<plan_filename>.md` next. Pi's command runtime will handle the fresh-session work handoff natively.
+- **`/workflows-work` on remote** → Only if the user explicitly wants remote/background execution, explain the exact command to run out-of-band. Do not launch a background `pi` process automatically from inside this planning run.
+- **Create Issue** → See "Issue Creation" section below.
+- **Other** (automatically provided) → Accept free text for rework or specific changes.
 
-**Important:** Slash commands (like `/deepen-plan`) are Pi prompt templates, not shell executables. Never run `/...` directly via bash.
+**Important:** Slash commands (like `/deepen-plan`) are Pi command/runtime features, not shell executables. Never launch local slash-command follow-ups by shelling out to nested `pi --no-session` processes from inside this workflow.
 
-**Note:** If running `/workflows-plan` with ultrathink enabled, automatically run `/deepen-plan` after plan creation by invoking `pi --no-session -p "/deepen-plan docs/plans/<plan_filename>.md"`.
+**Important:** The post-plan handoff should stay session-native and user-visible. Do not use `subagent` or nested `pi` CLI processes as a substitute for `/workflows-work`.
 
-Loop back to options after Simplify or Other changes until user selects `/workflows-work` or `/technical_review`.
+**Note:** Even with ultrathink enabled, do **not** auto-run `/deepen-plan` by spawning a nested `pi` process. Offer the next-step command explicitly instead.
+
+Loop back to options after Simplify or Other changes until user selects a next-step command or exits.
 
 ## Issue Creation
 

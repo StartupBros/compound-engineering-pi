@@ -24,8 +24,9 @@ Keep Pi-specific work here:
 - `extensions/workflow-context.ts`
 - Pi package docs
 - bundled/generated Pi assets:
-  - `skills/`
+  - `skills/` generated from upstream, plus explicitly preserved Pi-owned compatibility skills
   - `agents/`
+  - `prompts/` as the single published prompt-template source
   - `pi-resources/compound-engineering/mcporter.json`
   - vendored `plugins/compound-engineering/` snapshot
 - release/refresh tooling such as `scripts/sync-upstream-pi.ts`
@@ -69,7 +70,7 @@ What sync does:
 3. regenerates bundled Pi `skills/`
 4. regenerates bundled Pi `agents/`
 5. refreshes bundled `pi-resources/compound-engineering/mcporter.json` when upstream emits one
-6. preserves package-owned Pi runtime extensions and prompts
+6. preserves package-owned Pi runtime extensions, `prompts/`, and local compatibility skills (`onboarding`, `reproduce-bug`, `slfg`, `todo-resolve`, `todo-triage`)
 
 After syncing, regenerate local dogfood wrappers:
 
